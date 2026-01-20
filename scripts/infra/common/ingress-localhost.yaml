@@ -5,11 +5,11 @@ metadata:
   name: grafana
   namespace: manager
   annotations:
-    kubernetes.io/ingress.class: nginx
+    spec.ingressClassName: nginx
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
 spec:
   rules:
-    - host: grafana.127-0-0-1.sslip.io
+    - host: grafana.127.0.0.1.sslip.io
       http:
         paths:
           - path: /
@@ -26,11 +26,11 @@ metadata:
   name: prometheus
   namespace: manager
   annotations:
-    kubernetes.io/ingress.class: nginx
+    spec.ingressClassName: nginx
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
 spec:
   rules:
-    - host: prometheus.127-0-0-1.sslip.io
+    - host: prometheus.127.0.0.1.sslip.io
       http:
         paths:
           - path: /
@@ -48,7 +48,7 @@ metadata:
   namespace: default
 spec:
   rules:
-    - host: flink.127-0-0-1.sslip.io
+    - host: flink.127.0.0.1.sslip.io
       http:
         paths:
           - path: /

@@ -1,29 +1,18 @@
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
-  name: flink-kubernetes-operator
+  name: flink-pod-monitor
+  # Attach labels configured in prometheus.prometheusSpec.podMonitorSelector
   labels:
     release: prom
 spec:
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: flink-kubernetes-operator
-  podMetricsEndpoints:
-    - port: metrics
----
-apiVersion: monitoring.coreos.com/v1
-kind: PodMonitor
-metadata:
-  name: flink
-  labels:
-    release: prom
-spec:
-  namespaceSelector:
-    matchNames:
-      - default
+  podTargetLabels:
+    - cluster
+    - component
   selector:
     matchLabels:
       app: flink
+  # Specify the port name of the exposed metric port
   podMetricsEndpoints:
-    - targetPort: 9249
+    - port: prom
       interval: 5s

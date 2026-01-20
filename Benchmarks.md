@@ -1,20 +1,29 @@
-# Running benchmarks
+# Running the benchmarks
 
-## Motivation benchmarks
-Open the [./notebooks/motivation/xp.ipynb](http://localhost:8888/notebooks/notebooks/motivation/xp.ipynb) notebook in your browser (make sure your jupyter server is still up and running, following the Requirements.md instruction).
+## Accesses to Flink UI, Grafana, And Promotheus
 
-Before continuing, make sure that the Flink image name in the following file is the same as the one you used during the build phase:
-```yaml
-apiVersion: flink.apache.org/v1beta1
-kind: FlinkDeployment
-metadata:
-  name: flink
-spec:
-  image: flink-justin:dais <------- Your Flink image name
+We include, in the deployment scripts, the deployment of Ingresses to access the 3 desired services. They can be accessed via the following URLs.
+
+- Prometheus: [prometheus.127.0.0.1.sslip.io](prometheus.127.0.0.1.sslip.io)
+- Grafana: [grafana.127.0.0.1.sslip.io](grafana.127.0.0.1.sslip.io) (login: admin, password: prom-operator)
+- Flink UI: [flink.127.0.0.1.sslip.io](flink.127.0.0.1.sslip.io)
+
+The ingresses might not work in some setups. In that case, the easiest way to access those services is throw the Port-Forwarding capabilities of Kubernetes.
+In separate terminals, run the following commands:
+```bash
+# Grafana
+$ kubectl port-forward -n manager svc/prom-grafana 3000:80
 ```
-1. [./notebooks/motivation/read-only/query.yaml](./notebooks/motivation/read-only/query.yaml)
-1. [./notebooks/motivation/write-only/query.yaml](./notebooks/motivation/write-only/query.yaml)
-1. [./notebooks/motivation/update/query.yaml](./notebooks/motivation/update/query.yaml)
+
+```bash
+# Prometheus
+$ kubectl port-forward -n manager svc/prom-kube-prometheus-stack-prometheus 9090:9090
+```
+
+```bash
+# Flink (make sure the service is running, i.e., after submitting the query)
+$ kubectl port-forward svc/flink-rest 8081:8081
+```
 
 ## Nexmark benchmarks
 Open the [./notebooks/nexmark/xp.ipynb](http://localhost:8888/notebooks/notebooks/nexmark/xp.ipynb) notebook in your browser (make sure your jupyter server is still up and running, following the Requirements.md instruction).
@@ -52,3 +61,20 @@ The reviewer has access to previous Scaling Decisions (if any) through the `scal
 Once modified, the image needs to be rebuilt and pushed to the nodes.
 Delete the operator and its resources by executing the script `delete.sh` located in the `scripts`folder. This script will delete any Flink job pending, the operator, and the 3 custom resource definitions.
 Once deleted, you can re-deploy the operator following the previous instructions.
+
+
+## Motivation benchmarks
+Open the [./notebooks/motivation/xp.ipynb](http://localhost:8888/notebooks/notebooks/motivation/xp.ipynb) notebook in your browser (make sure your jupyter server is still up and running, following the Requirements.md instruction).
+
+Before continuing, make sure that the Flink image name in the following file is the same as the one you used during the build phase:
+```yaml
+apiVersion: flink.apache.org/v1beta1
+kind: FlinkDeployment
+metadata:
+  name: flink
+spec:
+  image: flink-justin:dais <------- Your Flink image name
+```
+1. [./notebooks/motivation/read-only/query.yaml](./notebooks/motivation/read-only/query.yaml)
+1. [./notebooks/motivation/write-only/query.yaml](./notebooks/motivation/write-only/query.yaml)
+1. [./notebooks/motivation/update/query.yaml](./notebooks/motivation/update/query.yaml)
