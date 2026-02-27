@@ -4,14 +4,14 @@ prometheus:
     nodePort: 30090
   prometheusSpec:
     nodeSelector:
-      tier: manager
+      tier: jobmanager
     podMonitorSelectorNilUseHelmValues: false
 grafana:
   service:
     type: NodePort
     nodePort: 30300
   nodeSelector:
-    tier: manager
+    tier: jobmanager
 kube-state-metrics:
   nodeSelector:
-    tier: manager
+    tier: jobmanager

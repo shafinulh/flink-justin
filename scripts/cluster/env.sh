@@ -1,0 +1,41 @@
+#!/bin/bash
+###############################################################################
+# env.sh - Cluster environment configuration
+#
+# Edit this file to match your physical machines.
+# All other scripts source this file.
+###############################################################################
+
+# ── Machine hostnames (must be resolvable via SSH) ──────────────────────────
+export CONTROL_PLANE="c180"            # Kubernetes control-plane + JobManager
+export WORKERS=("c182" "c167")         # TaskManager worker nodes
+export ALL_NODES=("$CONTROL_PLANE" "${WORKERS[@]}")
+
+# ── IP of the control-plane (used for the local Docker registry) ────────────
+export CONTROL_PLANE_IP="142.150.234.180"
+
+# ── Local Docker registry running on the control-plane ──────────────────────
+export REGISTRY="${CONTROL_PLANE_IP}:5000"
+
+# ── Image names / tags ──────────────────────────────────────────────────────
+export FLINK_IMAGE="${REGISTRY}/flink-justin:dais"
+export OPERATOR_IMAGE="${REGISTRY}/flink-kubernetes-operator:dais"
+export FLINK_IMAGE_NAME="flink-justin"
+export FLINK_IMAGE_TAG="dais"
+export OPERATOR_IMAGE_NAME="flink-kubernetes-operator"
+export OPERATOR_IMAGE_TAG="dais"
+
+# ── Paths (relative to repo root) ──────────────────────────────────────────
+export PROJECT_ROOT="/opt/flink-justin"
+export HELM_CHART="${PROJECT_ROOT}/flink-kubernetes-operator/helm/flink-kubernetes-operator"
+export AUTOSCALER_VALUES="${PROJECT_ROOT}/flink-kubernetes-operator/examples/autoscaling/values.yaml"
+export COMMON_INFRA="${PROJECT_ROOT}/scripts/infra/common"
+
+# ── Node labels used by Justin (matches the original authors' convention) ───
+export LABEL_MANAGER="tier=manager"
+export LABEL_JOBMANAGER="tier=jobmanager"
+export LABEL_TASKMANAGER="tier=taskmanager"
+
+# ── Prometheus / Grafana helm chart versions (keep in sync w/ values-prom) ──
+export PROM_CHART_VERSION="30.0.2"
+export LOKI_CHART_VERSION="2.6.0"
