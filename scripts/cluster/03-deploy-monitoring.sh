@@ -80,12 +80,12 @@ echo "── Step 8: Grafana dashboards ─────────────�
 # Provision Justin dashboards via labeled ConfigMaps (Grafana sidecar auto-detects them)
 kubectl create configmap grafana-dashboard-justin \
     --from-file=justin-dashboard.json="${COMMON_INFRA}/grafana.json" \
-    -n manager 2>/dev/null || true
+    -n manager --dry-run=client -o yaml | kubectl apply -f -
 kubectl label configmap grafana-dashboard-justin grafana_dashboard=1 -n manager --overwrite
 
 kubectl create configmap grafana-dashboard-autoscaling \
     --from-file=autoscaling-dashboard.json="${PROJECT_ROOT}/flink-kubernetes-operator/examples/autoscaling/grafana.json" \
-    -n manager 2>/dev/null || true
+    -n manager --dry-run=client -o yaml | kubectl apply -f -
 kubectl label configmap grafana-dashboard-autoscaling grafana_dashboard=1 -n manager --overwrite
 
 kubectl rollout restart deployment prom-grafana -n manager

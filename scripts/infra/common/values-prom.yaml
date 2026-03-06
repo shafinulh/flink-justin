@@ -12,6 +12,18 @@ grafana:
     nodePort: 30300
   nodeSelector:
     tier: jobmanager
+  sidecar:
+    datasources:
+      defaultDatasourceEnabled: false
+  additionalDataSources:
+    - name: Prometheus
+      uid: PBFA97CFB590B2093
+      type: prometheus
+      access: proxy
+      url: http://prom-kube-prometheus-stack-prometheus.manager:9090/
+      isDefault: true
+      jsonData:
+        timeInterval: 30s
 kube-state-metrics:
   nodeSelector:
     tier: jobmanager

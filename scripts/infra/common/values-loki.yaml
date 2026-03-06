@@ -1,3 +1,4 @@
 loki:
+  isDefault: false
   nodeSelector:
     tier: jobmanager
