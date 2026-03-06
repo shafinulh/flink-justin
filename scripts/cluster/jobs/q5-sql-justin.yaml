@@ -21,11 +21,12 @@ kind: FlinkDeployment
 metadata:
   name: flink
 spec:
-  image: 142.150.234.180:5000/flink-justin:dais
+  image: 142.150.234.180:5000/flink-justin-sql:dais
+  imagePullPolicy: Always
   flinkVersion: v1_18
   flinkConfiguration:
     job.autoscaler.enabled: "true"
-    job.autoscaler.justin.enabled: "false"
+    job.autoscaler.justin.enabled: "true"
     job.autoscaler.stabilization.interval: "1m"
     job.autoscaler.cache-hit-rate.min.threshold: "0.8"
     job.autoscaler.state-latency.threshold: "1000000.0"
@@ -38,17 +39,11 @@ spec:
     job.autoscaler.target.utilization.boundary: "0.3"
     metrics.reporters: prom
     metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporterFactory
-    #metrics.reporter.prom.port: 9250-9260
     web.submit.enable: "true"
     web.cancel.enable: "true"
     state.backend: "rocksdb"
     taskmanager.memory.managed.fraction: "0.4"
     taskmanager.cpu.cores: "4"
-    #taskmanager.memory.task.heap.size: "1530082070b"
-    #taskmanager.memory.task.off-heap.size: "0b"
-    #taskmanager.memory.network.max: "359703515b"
-    #taskmanager.memory.network.min: "359703515b"
-    #taskmanager.memory.managed.size: "1438814063b"
 
     state.backend.rocksdb.metrics.block-cache-usage: "true"
     state.backend.rocksdb.metrics.block-cache-hit: "true"
@@ -81,7 +76,6 @@ spec:
       name: pod-template
     spec:
       containers:
-        # Do not change the main container name
         - name: flink-main-container
           ports:
             - containerPort: 9249
@@ -120,20 +114,21 @@ spec:
                 app: flink
                 component: taskmanager
   job:
-    jarURI: local:///opt/flink/examples/justin/Query11.jar
+    jarURI: local:///opt/flink/lib/nexmark-flink-0.3-SNAPSHOT.jar
+    entryClass: com.github.nexmark.flink.sql.SqlQueryJob
     parallelism: 1
     upgradeMode: stateless
     args:
-      - "--srcRate"
+      - "--query"
+      - "q5"
+      - "--tps"
       - "50000"
-      - "--p-bid-source"
-      - "1"
-      - "--window"
-      - "100"
-      - "--maxEvents"
-      - "10000000"
-      - "--disableOperatorChaining"
-      - "true"
+      - "--events"
+      - "12500000"
+      - "--max-emit-speed"
+      - "false"
+      - "--job-name"
+      - "q5-sql-justin"
 
   logConfiguration:
     "log4j-console.properties": |

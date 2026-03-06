@@ -10,6 +10,7 @@
 # (running on c180:5000) so that all worker nodes can pull them.
 #
 # NOTE: The Flink build can take 15+ minutes due to the large codebase.
+# SQL jobs are packaged separately by 04b-build-nexmark-sql-image.sh.
 ###############################################################################
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -69,4 +70,5 @@ echo -e "${GREEN} Images built and pushed to registry!${NC}"
 echo ""
 echo " Workers will pull images from ${REGISTRY} when pods start."
 echo ""
-echo "Next: run 05-deploy-operator.sh"
+echo "Next: run 04b-build-nexmark-sql-image.sh if you need SQL jobs,"
+echo "      then run 05-deploy-operator.sh"

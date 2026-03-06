@@ -44,6 +44,23 @@ if [[ ! -f "$QUERY_YAML" ]]; then
 fi
 
 QUERY_NAME=$(basename "$QUERY_YAML" .yaml)
+DEPLOYMENT_NAME="$(kubectl create --dry-run=client -f "$QUERY_YAML" -o jsonpath='{.metadata.name}')"
+
+print_deployment_failure() {
+    echo ""
+    echo "── Flink deployment failure details ────────────────────────"
+    kubectl get flinkdeployment "${DEPLOYMENT_NAME}" -o wide 2>/dev/null || true
+
+    DEPLOYMENT_ERROR=$(kubectl get flinkdeployment "${DEPLOYMENT_NAME}" -o jsonpath='{.status.error}' 2>/dev/null || true)
+    if [[ -n "${DEPLOYMENT_ERROR}" ]]; then
+        echo ""
+        echo "Status error:"
+        echo "${DEPLOYMENT_ERROR}"
+    fi
+
+    echo ""
+    kubectl describe flinkdeployment "${DEPLOYMENT_NAME}" 2>/dev/null || true
+}
 
 echo "============================================================"
 echo " Submitting: ${QUERY_NAME}"
@@ -75,6 +92,15 @@ echo -e "${GREEN}✓${NC} Applied ${QUERY_YAML}"
 echo ""
 echo "── Waiting for Flink pods to start ──────────────────────────"
 for i in $(seq 1 60); do
+    LIFECYCLE_STATE=$(kubectl get flinkdeployment "${DEPLOYMENT_NAME}" -o jsonpath='{.status.lifecycleState}' 2>/dev/null || true)
+    JOB_STATE=$(kubectl get flinkdeployment "${DEPLOYMENT_NAME}" -o jsonpath='{.status.jobStatus.state}' 2>/dev/null || true)
+
+    if [[ "$LIFECYCLE_STATE" == "FAILED" || "$JOB_STATE" == "FAILED" ]]; then
+        echo -e "${RED}✗ Flink deployment failed during startup.${NC}"
+        print_deployment_failure
+        exit 1
+    fi
+
     JM_STATUS=$(kubectl get pods -l component=jobmanager --no-headers 2>/dev/null | awk '{print $3}' | head -1)
     TM_STATUS=$(kubectl get pods -l component=taskmanager --no-headers 2>/dev/null | awk '{print $3}' | head -1)
 
@@ -107,6 +133,12 @@ for i in $(seq 1 30); do
     echo "  Waiting..."
     sleep 5
 done
+
+if ! kubectl get svc flink-rest &>/dev/null; then
+    echo -e "${RED}✗ flink-rest service never appeared.${NC}"
+    print_deployment_failure
+    exit 1
+fi
 
 # ── Start Flink UI port-forward ─────────────────────────────────────────────
 echo ""

@@ -41,6 +41,9 @@ Run these **in order** from c180 (`/opt/flink-justin/scripts/cluster/`):
 # 4. Build Docker images (flink-justin + operator) — ~15 min
 ./04-build-images.sh
 
+# 4b. Build the Nexmark SQL overlay image
+./04b-build-nexmark-sql-image.sh
+
 # 5. Deploy the Flink Kubernetes Operator via Helm
 ./05-deploy-operator.sh
 
@@ -67,6 +70,9 @@ After all scripts complete, query YAML files are in `scripts/cluster/jobs/`:
 # Submit a Nexmark query with Justin autoscaler enabled
 kubectl apply -f jobs/query5-justin.yaml
 
+# Submit a Nexmark SQL query with Justin autoscaler enabled
+kubectl apply -f jobs/q20_unique-sql-justin.yaml
+
 # Watch the deployment
 kubectl get flinkdeployment -w
 
@@ -85,6 +91,24 @@ kubectl delete -f jobs/query5-justin.yaml
 Each query has two variants:
 - `queryX-ds2.yaml` — Uses the default DS2 autoscaler (`justin.enabled: false`)
 - `queryX-justin.yaml` — Uses the Justin autoscaler (`justin.enabled: true`)
+- `qX-sql-ds2.yaml` / `qX-sql-justin.yaml` — Runs the curated SQL query set via `com.github.nexmark.flink.sql.SqlQueryJob` on the dedicated `flink-justin-sql` overlay image
+
+### SQL Jobs
+
+`06-prepare-jobs.sh` also generates SQL CRs for:
+`q20`, `q20_unique`, `q9`, `q9_unique`, `q4`, `q4_unique`, `q18`, `q19`, `q1`, `q3`, `q5`, `q8`, `q11`.
+
+Build the SQL overlay image first with `./04b-build-nexmark-sql-image.sh`. That script compiles
+`nexmark-v2` and layers `nexmark-flink-0.3-SNAPSHOT.jar` onto the base `flink-justin` image without
+rebuilding the entire Flink distribution. By default it also pre-pulls the SQL image onto
+`c180`, `c182`, and `c167` so the first SQL job does not stall in `ContainerCreating` while the
+nodes fetch the image. Set `PREPULL_SQL_IMAGE=false` to skip that step.
+
+By default these use `--tps 10000` and `--events 0`; override them when generating by exporting
+`NEXMARK_SQL_TPS` and `NEXMARK_SQL_EVENTS` before running the script.
+
+Generated files are not overwritten on subsequent runs. If you want to rebuild them from source,
+run `FORCE_REGENERATE=true ./06-prepare-jobs.sh`.
 
 ### Justin Tuning Parameters
 

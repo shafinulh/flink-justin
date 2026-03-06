@@ -91,6 +91,14 @@ spec:
     resource:
       memory: "2048m"
       cpu: 1
+    podTemplate:
+      apiVersion: v1
+      kind: Pod
+      metadata:
+        name: job-manager-pod-template
+      spec:
+        nodeSelector:
+          tier: jobmanager
 
   taskManager:
     resource:
@@ -101,6 +109,17 @@ spec:
       kind: Pod
       metadata:
         name: task-manager-pod-template
+      spec:
+        nodeSelector:
+          tier: taskmanager
+        topologySpreadConstraints:
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: DoNotSchedule
+            labelSelector:
+              matchLabels:
+                app: flink
+                component: taskmanager
   job:
     jarURI: local:///opt/flink/examples/justin/Query1.jar
     parallelism: 1
