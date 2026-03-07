@@ -21,11 +21,12 @@ kind: FlinkDeployment
 metadata:
   name: flink
 spec:
-  image: 142.150.234.180:5000/flink-justin:dais
+  image: __FLINK_IMAGE__
+  imagePullPolicy: Always
   flinkVersion: v1_18
   flinkConfiguration:
     job.autoscaler.enabled: "true"
-    job.autoscaler.justin.enabled: "false"
+    job.autoscaler.justin.enabled: "__JUSTIN_ENABLED__"
     job.autoscaler.stabilization.interval: "1m"
     job.autoscaler.cache-hit-rate.min.threshold: "0.8"
     job.autoscaler.state-latency.threshold: "1000000.0"
@@ -38,7 +39,6 @@ spec:
     job.autoscaler.target.utilization.boundary: "0.3"
     metrics.reporters: prom
     metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporterFactory
-    #metrics.reporter.prom.port: 9250-9260
     web.submit.enable: "true"
     web.cancel.enable: "true"
     state.backend: "rocksdb"
@@ -65,6 +65,8 @@ spec:
     state.backend.rocksdb.metrics.total-sst-files-size: "true"
 
     state.backend.latency-track.keyed-state-enabled: "true"
+    state.backend.rocksdb.use-direct-writes: "true"
+    state.backend.rocksdb.use-direct-reads: "true"
 
   serviceAccount: flink
   podTemplate:
@@ -74,7 +76,6 @@ spec:
       name: pod-template
     spec:
       containers:
-        # Do not change the main container name
         - name: flink-main-container
           ports:
             - containerPort: 9249
@@ -83,6 +84,14 @@ spec:
     resource:
       memory: "2048m"
       cpu: 1
+    podTemplate:
+      apiVersion: v1
+      kind: Pod
+      metadata:
+        name: job-manager-pod-template
+      spec:
+        nodeSelector:
+          tier: jobmanager
 
   taskManager:
     resource:
@@ -93,21 +102,22 @@ spec:
       kind: Pod
       metadata:
         name: task-manager-pod-template
+      spec:
+        nodeSelector:
+          tier: taskmanager
   job:
-    jarURI: local:///opt/flink/examples/justin/Query3.jar
+    jarURI: local:///opt/flink/examples/justin/Query11.jar
     parallelism: 1
     upgradeMode: stateless
     args:
-      - "--auction-srcRate"
-      - "60000"
-      - "--person-srcRate"
-      - "30000"
-      - "--p-auction-source"
+      - "--srcRate"
+      - "50000"
+      - "--p-bid-source"
       - "1"
-      - "--p-person-source"
-      - "1"
-      - "--p-join"
-      - "1"
+      - "--window"
+      - "100"
+      - "--maxEvents"
+      - "10000000"
       - "--disableOperatorChaining"
       - "true"
 

@@ -1,0 +1,6 @@
+# Generated job YAMLs (each person runs 06-generate-jobs.sh to generate the experiment job yamls)
+scripts/cluster/jobs/
+
+# Python
+__pycache__/
+*.pyc

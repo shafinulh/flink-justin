@@ -1,113 +1,171 @@
-# Justin Cluster Setup Scripts
+# Justin Cluster Scripts
 
-Repeatable scripts to set up and manage the Justin Flink cluster on bare-metal
-machines using **kubeadm** (not Kind, not Grid5000).
+Scripts to set up and run the Justin Flink cluster on bare-metal (kubeadm).
 
 ## Cluster Layout
 
 | Machine | Role | K8s Label |
 |---------|------|-----------|
 | **c180** | Control-plane, JobManager, Monitoring | `tier=jobmanager` |
-| **c182** | Worker – TaskManager pods | `tier=taskmanager` |
-| **c167** | Worker – TaskManager pods | `tier=taskmanager` |
+| **c182** | Worker (TaskManager) | `tier=taskmanager` |
+| **c167** | Worker (TaskManager) | `tier=taskmanager` |
 
-## Prerequisites (already installed)
+Workers have a 512 GB SSD (`/dev/sdb`) mounted at `/data`.
+RocksDB SSD experiments use `/data/flink/rocksdb`.
 
-- Kubernetes 1.29 (kubeadm, kubelet, kubectl) on all 3 machines
-- containerd 1.7.28 on all machines
-- Docker 28.x on c180 (for building images)
+## Prerequisites
+
+- Kubernetes 1.29 (kubeadm, kubelet, kubectl) on all nodes
+- containerd 1.7.28 on all nodes
+- Docker 28.x on c180
 - Helm 3.19 on c180
-- Local Docker registry on c180:5000
-- SSH access from c180 → c182, c167
+- Local Docker registry at c180:5000
+- SSH from c180 → workers
 
-## Script Execution Order
+## Setup (run in order from c180)
 
-Run these **in order** from c180 (`/opt/flink-justin/scripts/cluster/`):
-
-```
-# 0. Verify all dependencies are present
-./00-check-prereqs.sh
-
-# 1. CHOOSE ONE:
-./01-reset-cluster.sh     # Full reset: tears down k8s and reinitializes
-./01b-soft-reset.sh       # Soft reset: keeps k8s, removes Flink/monitoring
-
-# 2. Label nodes for scheduling
-./02-label-nodes.sh
-
-# 3. Deploy Prometheus, Grafana, Loki, cert-manager
-./03-deploy-monitoring.sh
-
-# 4. Build Docker images (flink-justin + operator) — ~15 min
-./04-build-images.sh
-
-# 5. Deploy the Flink Kubernetes Operator via Helm
-./05-deploy-operator.sh
-
-# 6. Generate ready-to-submit query YAML files
-./06-prepare-jobs.sh
-
-# 7. (Optional) Start port-forwarding for UIs
-./07-port-forward.sh
+```bash
+./00-check-prereqs.sh          # Verify dependencies
+./01-reset-cluster.sh          # Full k8s reset (or ./01b-soft-reset.sh for soft)
+./02-label-nodes.sh            # Label nodes for JM/TM scheduling
+./03-deploy-monitoring.sh      # Prometheus, Grafana, Loki, cert-manager
+./04-build-images.sh           # Build flink-justin + operator images (~15 min)
+./04b-build-nexmark-sql-image.sh  # Build SQL overlay image (if running SQL queries)
+./05-deploy-operator.sh        # Deploy Flink K8s Operator via Helm
+./06-generate-jobs.sh          # Generate job YAMLs from templates
 ```
 
 ## Configuration
 
-Edit **`env.sh`** to change:
-- Machine hostnames and IPs
-- Docker image names and tags
-- Helm chart versions
-- File paths
+All machine hostnames, image names/tags, paths, and chart versions live in
+**`env.sh`**. Every other script sources it.
+
+## Generating Jobs
+
+`jobs/` is git-ignored. Run `06-generate-jobs.sh` to generate job YAMLs for
+your environment.
+
+### How it works
+
+Templates live in `templates/`:
+
+| Template | Description |
+|----------|-------------|
+| `nexmark-query{N}.yaml.template` | Per-query DataStream template (q1, q2, q3, q5, q8, q11) with its jar, args, and config |
+| `nexmark-sql-job.yaml.template` | Shared template for all 13 SQL queries with `__QUERY__`, `__TPS__`, etc. placeholders |
+
+Every template has two common placeholders:
+
+- **`__FLINK_IMAGE__`** — replaced with `FLINK_IMAGE` (DataStream) or `FLINK_SQL_IMAGE` (SQL) from `env.sh`
+- **`__JUSTIN_ENABLED__`** — set to `"true"` for `-justin` variants or `"false"` for `-ds2` variants
+
+For SSD variants, a Python helper (`inject_ssd_config`) post-processes the
+generated YAML to add `state.backend.rocksdb.localdir`, a `hostPath` volume,
+and a `volumeMount` to the taskManager podTemplate.
+
+### Modes
+
+| Mode | Output files |
+|---------|--------------------------------------------------------------|
+| `default` | `queryX-ds2.yaml`, `queryX-justin.yaml` |
+| `ssd` | `queryX-ssd-ds2.yaml`, `queryX-ssd-justin.yaml` |
+| `sql` | `qX-sql-ds2.yaml`, `qX-sql-justin.yaml` |
+| `sql-ssd` | `qX-sql-ssd-ds2.yaml`, `qX-sql-ssd-justin.yaml` |
+| `all` | All of the above (default) |
+
+Combine modes: `./06-generate-jobs.sh default sql`
+
+### Options
+
+| Env var | Default | Description |
+|---------|---------|-------------|
+| `CLEAN` | `false` | Delete all `.yaml` in `jobs/` first |
+| `FORCE_REGENERATE` | `false` | Overwrite existing files |
+| `SSD_HOST_PATH` | `/data/flink/rocksdb` | Host path for SSD on workers |
+
+### Examples
+
+```bash
+./06-generate-jobs.sh                             # everything
+./06-generate-jobs.sh default sql                 # DataStream + SQL, no SSD
+./06-generate-jobs.sh ssd sql-ssd                 # SSD variants only
+CLEAN=true ./06-generate-jobs.sh                  # wipe and regenerate
+FORCE_REGENERATE=true ./06-generate-jobs.sh sql   # overwrite SQL jobs
+SSD_HOST_PATH=/mnt/nvme ./06-generate-jobs.sh ssd # custom SSD path
+```
 
 ## Running Experiments
 
-After all scripts complete, query YAML files are in `scripts/cluster/jobs/`:
+Submit a job with `run-job.sh`. It applies the YAML, waits for pods, and
+starts a Flink UI port-forward automatically.
 
 ```bash
-# Submit a Nexmark query with Justin autoscaler enabled
-kubectl apply -f jobs/query5-justin.yaml
+./run-job.sh jobs/query5-justin.yaml
+./run-job.sh jobs/query5-ssd-ds2.yaml
+./run-job.sh jobs/q20_unique-sql-justin.yaml
+```
 
-# Watch the deployment
-kubectl get flinkdeployment -w
+Once the job is up, in a **separate terminal** run `./07-port-forward.sh` to
+access Grafana and Prometheus locally.
 
-# Watch pods
-kubectl get pods -w
+Useful watch commands:
 
-# Access Flink UI
-kubectl port-forward svc/flink-rest 8081:8081
+```bash
+kubectl get flinkdeployment -w -o wide
+kubectl get pods -o wide -w
+```
 
-# Delete the job when done
+To stop a job:
+
+```bash
 kubectl delete -f jobs/query5-justin.yaml
+```
+
+### Between Experiment Runs
+
+Redeploy the operator for a clean state:
+
+```bash
+./05b-redeploy-operator.sh
+```
+
+### Observing Scaling Decisions
+
+```bash
+./08-observe-scaling.py              # latest scaling config
+./08-observe-scaling.py --follow     # poll every 30s
+./08-observe-scaling.py --json       # JSON output
 ```
 
 ### DS2 vs Justin
 
-Each query has two variants:
-- `queryX-ds2.yaml` — Uses the default DS2 autoscaler (`justin.enabled: false`)
-- `queryX-justin.yaml` — Uses the Justin autoscaler (`justin.enabled: true`)
+Every query has two variants:
+- `-ds2` — default DS2 autoscaler (`justin.enabled: false`)
+- `-justin` — Justin autoscaler (`justin.enabled: true`)
 
-### Justin Tuning Parameters
+SSD variants add `-ssd-` to the name (e.g., `query5-ssd-justin.yaml`).
 
-In the query YAML files, you can adjust:
-- `job.autoscaler.cache-hit-rate.min.threshold: "0.8"` (ratio)
-- `job.autoscaler.state-latency.threshold: "1000000.0"` (nanoseconds)
-- `job.autoscaler.stabilization.interval: "1m"`
-- `job.autoscaler.metrics.window: "2m"`
+### Tuning Parameters
 
-## Utility Scripts
+Adjust in the generated YAML (or edit the template):
+- `job.autoscaler.cache-hit-rate.min.threshold` — ratio (default `"0.8"`)
+- `job.autoscaler.state-latency.threshold` — nanoseconds (default `"1000000.0"`)
+- `job.autoscaler.stabilization.interval` — default `"1m"`
+- `job.autoscaler.metrics.window` — default `"2m"`
+
+## Monitoring
+
+`./07-port-forward.sh` forwards all three UIs:
+
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| Flink UI | http://c180:8081 | — |
+| Grafana | http://c180:3001 | admin / prom-operator |
+| Prometheus | http://c180:9091 | — |
+
+## Utility
 
 ```bash
-# Check cluster status at a glance
-./status.sh
-
-# Tear down just the Flink operator + jobs
-bash /opt/flink-justin/scripts/delete.sh
+./status.sh                          # cluster status at a glance
+bash /opt/flink-justin/scripts/delete.sh  # tear down operator + jobs
 ```
-
-## Monitoring Access
-
-| Service | Port-forward command | URL | Credentials |
-|---------|---------------------|-----|-------------|
-| Grafana | `kubectl port-forward -n manager svc/prom-grafana 3000:80` | http://c180:3000 | admin / prom-operator |
-| Prometheus | `kubectl port-forward -n manager svc/prom-kube-prometheus-stack-prometheus 9090:9090` | http://c180:9090 | — |
-| Flink UI | `kubectl port-forward svc/flink-rest 8081:8081` | http://c180:8081 | — |

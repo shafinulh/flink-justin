@@ -19,11 +19,16 @@ export REGISTRY="${CONTROL_PLANE_IP}:5000"
 
 # ── Image names / tags ──────────────────────────────────────────────────────
 export FLINK_IMAGE="${REGISTRY}/flink-justin:dais"
+export FLINK_SQL_IMAGE="${REGISTRY}/flink-justin-sql:dais"
 export OPERATOR_IMAGE="${REGISTRY}/flink-kubernetes-operator:dais"
 export FLINK_IMAGE_NAME="flink-justin"
 export FLINK_IMAGE_TAG="dais"
+export FLINK_SQL_IMAGE_NAME="flink-justin-sql"
+export FLINK_SQL_IMAGE_TAG="dais"
 export OPERATOR_IMAGE_NAME="flink-kubernetes-operator"
 export OPERATOR_IMAGE_TAG="dais"
+export NEXMARK_FLINK_VERSION="1.18-SNAPSHOT"
+export CRI_RUNTIME_ENDPOINT="unix:///run/containerd/containerd.sock"
 
 # ── Paths (relative to repo root) ──────────────────────────────────────────
 export PROJECT_ROOT="/opt/flink-justin"

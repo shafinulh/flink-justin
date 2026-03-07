@@ -1851,12 +1851,284 @@
       "type": "timeseries"
     },
     {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 83
+      },
+      "id": 66,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "exemplar": true,
+          "expr": "sum(flink_taskmanager_job_task_operator_rocksdb_block_cache_hit{task_name=~\"$task_name\", subtask_index=~\"$subtask_index\", job_id=~\"$job_id\"})",
+          "interval": "15s",
+          "legendFormat": "Hits",
+          "refId": "A"
+        }
+      ],
+      "title": "Block Cache Hits (Total)",
+      "type": "timeseries"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 91
+      },
+      "id": 67,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "exemplar": true,
+          "expr": "sum(flink_taskmanager_job_task_operator_rocksdb_block_cache_miss{task_name=~\"$task_name\", subtask_index=~\"$subtask_index\", job_id=~\"$job_id\"})",
+          "interval": "15s",
+          "legendFormat": "Misses",
+          "refId": "A"
+        }
+      ],
+      "title": "Block Cache Misses (Total)",
+      "type": "timeseries"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 99
+      },
+      "id": 68,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "sum(max by (job_id, task_name, subtask_index) (flink_taskmanager_job_task_operator_column_family_rocksdb_block_cache_usage{task_name=~\"$task_name\", subtask_index=~\"$subtask_index\", job_id=~\"$job_id\"}))",
+          "legendFormat": "Usage",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "sum(max by (job_id, task_name, subtask_index) (flink_taskmanager_job_task_operator_column_family_rocksdb_block_cache_capacity{task_name=~\"$task_name\", subtask_index=~\"$subtask_index\", job_id=~\"$job_id\"}))",
+          "legendFormat": "Capacity",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "sum(max by (job_id, task_name, subtask_index) (flink_taskmanager_job_task_operator_column_family_rocksdb_block_cache_pinned_usage{task_name=~\"$task_name\", subtask_index=~\"$subtask_index\", job_id=~\"$job_id\"}))",
+          "legendFormat": "Pinned",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Block Cache Usage / Capacity / Pinned",
+      "type": "timeseries"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 83
+        "y": 107
       },
       "id": 16,
       "panels": [],
@@ -1917,7 +2189,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 84
+        "y": 108
       },
       "id": 22,
       "options": {
@@ -2006,7 +2278,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 84
+        "y": 108
       },
       "id": 18,
       "options": {
@@ -2089,7 +2361,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 92
+        "y": 116
       },
       "id": 12,
       "options": {
@@ -2178,7 +2450,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 92
+        "y": 116
       },
       "id": 20,
       "options": {
@@ -2213,7 +2485,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 100
+        "y": 124
       },
       "id": 14,
       "panels": [],
@@ -2274,7 +2546,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 101
+        "y": 125
       },
       "id": 24,
       "options": {
@@ -2358,7 +2630,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 101
+        "y": 125
       },
       "id": 8,
       "options": {
@@ -2441,7 +2713,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 109
+        "y": 133
       },
       "id": 6,
       "options": {
@@ -2492,8 +2764,12 @@
       {
         "current": {
           "selected": false,
-          "text": "Source:_KafkaSource_default_catalog_default_database_kafka",
-          "value": "Source:_KafkaSource_default_catalog_default_database_kafka"
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "PBFA97CFB590B2093"
         },
         "definition": "label_values(flink_taskmanager_job_task_isBackPressured, task_name)",
         "hide": 0,
@@ -2517,6 +2793,10 @@
           "text": "All",
           "value": "$__all"
         },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "PBFA97CFB590B2093"
+        },
         "definition": "label_values(flink_taskmanager_job_task_isBackPressured, subtask_index)",
         "hide": 0,
         "includeAll": true,
@@ -2538,6 +2818,10 @@
           "selected": false,
           "text": "All",
           "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "PBFA97CFB590B2093"
         },
         "definition": "label_values(flink_taskmanager_job_task_isBackPressured, job_id)",
         "description": "job_id",
