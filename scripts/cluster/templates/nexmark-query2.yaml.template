@@ -21,12 +21,12 @@ kind: FlinkDeployment
 metadata:
   name: flink
 spec:
-  image: 142.150.234.180:5000/flink-justin-sql:dais
+  image: __FLINK_IMAGE__
   imagePullPolicy: Always
   flinkVersion: v1_18
   flinkConfiguration:
     job.autoscaler.enabled: "true"
-    job.autoscaler.justin.enabled: "false"
+    job.autoscaler.justin.enabled: "__JUSTIN_ENABLED__"
     job.autoscaler.stabilization.interval: "1m"
     job.autoscaler.cache-hit-rate.min.threshold: "0.8"
     job.autoscaler.state-latency.threshold: "1000000.0"
@@ -105,30 +105,17 @@ spec:
       spec:
         nodeSelector:
           tier: taskmanager
-        topologySpreadConstraints:
-          - maxSkew: 1
-            topologyKey: kubernetes.io/hostname
-            whenUnsatisfiable: DoNotSchedule
-            labelSelector:
-              matchLabels:
-                app: flink
-                component: taskmanager
   job:
-    jarURI: local:///opt/flink/lib/nexmark-flink-0.3-SNAPSHOT.jar
-    entryClass: com.github.nexmark.flink.sql.SqlQueryJob
+    jarURI: local:///opt/flink/examples/justin/Query2.jar
     parallelism: 1
     upgradeMode: stateless
     args:
-      - "--query"
-      - "q20"
-      - "--tps"
-      - "50000"
-      - "--events"
-      - "12500000"
-      - "--max-emit-speed"
-      - "false"
-      - "--job-name"
-      - "q20-sql-ds2"
+      - "--srcRate"
+      - "105000"
+      - "--p-source"
+      - "15"
+      - "--disableOperatorChaining"
+      - "true"
 
   logConfiguration:
     "log4j-console.properties": |
