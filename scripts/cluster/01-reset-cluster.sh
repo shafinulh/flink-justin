@@ -65,6 +65,8 @@ echo "── Step 4: Configure kubectl ─────────────�
 mkdir -p "${HOME}/.kube"
 sudo cp -f /etc/kubernetes/admin.conf "${HOME}/.kube/config"
 sudo chown "$(id -u):$(id -g)" "${HOME}/.kube/config"
+sudo install -d -m 750 -o root -g users "$(dirname "${SHARED_KUBECONFIG}")"
+sudo install -m 640 -o root -g users /etc/kubernetes/admin.conf "${SHARED_KUBECONFIG}"
 echo -e "${GREEN}✓${NC} kubectl configured"
 
 echo ""

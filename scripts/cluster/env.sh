@@ -30,11 +30,21 @@ export OPERATOR_IMAGE_TAG="dais"
 export NEXMARK_FLINK_VERSION="1.18-SNAPSHOT"
 export CRI_RUNTIME_ENDPOINT="unix:///run/containerd/containerd.sock"
 
-# ── Paths (relative to repo root) ──────────────────────────────────────────
-export PROJECT_ROOT="/opt/flink-justin"
+# ── Paths (relative to this checkout) ──────────────────────────────────────
+export PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+export SHARED_KUBECONFIG="/etc/flink-justin/kubeconfig"
 export HELM_CHART="${PROJECT_ROOT}/flink-kubernetes-operator/helm/flink-kubernetes-operator"
 export AUTOSCALER_VALUES="${PROJECT_ROOT}/flink-kubernetes-operator/examples/autoscaling/values.yaml"
 export COMMON_INFRA="${PROJECT_ROOT}/scripts/infra/common"
+
+# Use one shared kubeconfig for the machine; fall back to admin.conf when available.
+if [[ -z "${KUBECONFIG:-}" ]]; then
+    if [[ -r "${SHARED_KUBECONFIG}" ]]; then
+        export KUBECONFIG="${SHARED_KUBECONFIG}"
+    elif [[ -r "/etc/kubernetes/admin.conf" ]]; then
+        export KUBECONFIG="/etc/kubernetes/admin.conf"
+    fi
+fi
 
 # ── Node labels used by Justin (matches the original authors' convention) ───
 export LABEL_MANAGER="tier=manager"
