@@ -36,6 +36,10 @@ export SHARED_KUBECONFIG="/etc/flink-justin/kubeconfig"
 export HELM_CHART="${PROJECT_ROOT}/flink-kubernetes-operator/helm/flink-kubernetes-operator"
 export AUTOSCALER_VALUES="${PROJECT_ROOT}/flink-kubernetes-operator/examples/autoscaling/values.yaml"
 export COMMON_INFRA="${PROJECT_ROOT}/scripts/infra/common"
+export CHECKPOINT_HOST_PATH="${CHECKPOINT_HOST_PATH:-/mnt/home/haques24/flink-state}"
+export CHECKPOINT_MOUNT_PATH="${CHECKPOINT_MOUNT_PATH:-/mnt/home/haques24/flink-state}"
+export CHECKPOINT_DIR="${CHECKPOINT_DIR:-file://${CHECKPOINT_MOUNT_PATH}/checkpoints}"
+export SAVEPOINT_DIR="${SAVEPOINT_DIR:-file://${CHECKPOINT_MOUNT_PATH}/savepoints}"
 
 # Use one shared kubeconfig for the machine; fall back to admin.conf when available.
 if [[ -z "${KUBECONFIG:-}" ]]; then

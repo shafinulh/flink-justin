@@ -143,6 +143,17 @@ import sys, yaml
 with open(sys.argv[1]) as f:
     doc = yaml.safe_load(f)
 
+checkpoint_host_path = sys.argv[2]
+checkpoint_mount_path = sys.argv[3]
+ssd_path = sys.argv[4]
+
+def ensure_named(entries, name, value):
+    for entry in entries:
+        if entry.get('name') == name:
+            entry.update(value)
+            return
+    entries.append({'name': name, **value})
+
 # Add rocksdb localdir
 doc['spec']['flinkConfiguration']['state.backend.rocksdb.localdir'] = '/data/flink/rocksdb'
 
@@ -158,15 +169,17 @@ if main_c is None:
     main_c = {'name': 'flink-main-container'}
     containers.append(main_c)
 mounts = main_c.setdefault('volumeMounts', [])
-mounts.append({'name': 'rocksdb-ssd', 'mountPath': '/data/flink/rocksdb'})
+ensure_named(mounts, 'checkpoint-storage', {'mountPath': checkpoint_mount_path})
+ensure_named(mounts, 'rocksdb-ssd', {'mountPath': '/data/flink/rocksdb'})
 
-# Add hostPath volume
+# Add hostPath volumes
 volumes = tm.setdefault('volumes', [])
-volumes.append({'name': 'rocksdb-ssd', 'hostPath': {'path': sys.argv[2], 'type': 'DirectoryOrCreate'}})
+ensure_named(volumes, 'checkpoint-storage', {'hostPath': {'path': checkpoint_host_path, 'type': 'DirectoryOrCreate'}})
+ensure_named(volumes, 'rocksdb-ssd', {'hostPath': {'path': ssd_path, 'type': 'DirectoryOrCreate'}})
 
-with open(sys.argv[3], 'w') as f:
+with open(sys.argv[5], 'w') as f:
     yaml.dump(doc, f, default_flow_style=False, sort_keys=False, width=200)
-" "$input" "$ssd_path" "$output"
+" "$input" "$CHECKPOINT_HOST_PATH" "$CHECKPOINT_MOUNT_PATH" "$ssd_path" "$output"
 }
 
 # ── Helper: generate a job from a template ───────────────────────────────────
@@ -177,6 +190,10 @@ generate_from_template() {
     local sed_args=(
         -e "s|__FLINK_IMAGE__|${image}|g"
         -e "s|__JUSTIN_ENABLED__|${justin}|g"
+        -e "s|__CHECKPOINT_HOST_PATH__|${CHECKPOINT_HOST_PATH}|g"
+        -e "s|__CHECKPOINT_MOUNT_PATH__|${CHECKPOINT_MOUNT_PATH}|g"
+        -e "s|__CHECKPOINT_DIR__|${CHECKPOINT_DIR}|g"
+        -e "s|__SAVEPOINT_DIR__|${SAVEPOINT_DIR}|g"
     )
     # Append any extra sed expressions (for SQL placeholders)
     sed_args+=("$@")

@@ -34,6 +34,12 @@ spec:
     pipeline.max-parallelism: "24"
     taskmanager.numberOfTaskSlots: "4"
     execution.checkpointing.interval: "300m"
+    state.checkpoints.dir: "__CHECKPOINT_DIR__"
+    execution.checkpointing.savepoint-dir: "__SAVEPOINT_DIR__"
+    execution.checkpointing.incremental: "true"
+    execution.checkpointing.mode: "EXACTLY_ONCE"
+    execution.checkpointing.externalized-checkpoint-retention: "RETAIN_ON_CANCELLATION"
+    state.backend.local-recovery: "true"
     jobmanager.scheduler: adaptive
     job.autoscaler.target.utilization: "0.5"
     job.autoscaler.target.utilization.boundary: "0.3"
@@ -80,6 +86,14 @@ spec:
           ports:
             - containerPort: 9249
               name: prom
+          volumeMounts:
+            - name: checkpoint-storage
+              mountPath: __CHECKPOINT_MOUNT_PATH__
+      volumes:
+        - name: checkpoint-storage
+          hostPath:
+            path: __CHECKPOINT_HOST_PATH__
+            type: DirectoryOrCreate
   jobManager:
     resource:
       memory: "2048m"
@@ -105,6 +119,16 @@ spec:
       spec:
         nodeSelector:
           tier: taskmanager
+        containers:
+          - name: flink-main-container
+            volumeMounts:
+              - name: checkpoint-storage
+                mountPath: __CHECKPOINT_MOUNT_PATH__
+        volumes:
+          - name: checkpoint-storage
+            hostPath:
+              path: __CHECKPOINT_HOST_PATH__
+              type: DirectoryOrCreate
   job:
     jarURI: local:///opt/flink/examples/justin/Query11.jar
     parallelism: 1

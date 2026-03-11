@@ -121,6 +121,13 @@ To stop a job:
 kubectl delete -f jobs/query5-justin.yaml
 ```
 
+To stop the current in-cluster Flink deployment and free local port `8081`
+without uninstalling the operator:
+
+```bash
+./09-stop-flink.sh
+```
+
 ### Between Experiment Runs
 
 Redeploy the operator for a clean state:
@@ -167,5 +174,6 @@ Adjust in the generated YAML (or edit the template):
 
 ```bash
 ./status.sh                          # cluster status at a glance
+./09-stop-flink.sh                   # stop only the in-cluster Flink deployment
 bash /opt/flink-justin/scripts/delete.sh  # tear down operator + jobs
 ```
