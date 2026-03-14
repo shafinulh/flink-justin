@@ -4,3 +4,4 @@ scripts/cluster/jobs/
 # Python
 __pycache__/
 *.pyc
+/venv
