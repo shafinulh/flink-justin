@@ -97,6 +97,10 @@ read_suite_value() {
 DEFAULT_SQL_TPS="${NEXMARK_SQL_TPS:-$(read_suite_value "tps" "50000")}"
 DEFAULT_SQL_EVENTS="${NEXMARK_SQL_EVENTS:-$(read_suite_value "events.num" "12500000")}"
 DEFAULT_SQL_MAX_EMIT_SPEED="${NEXMARK_SQL_MAX_EMIT_SPEED:-false}"
+DEFAULT_SQL_PROB_DELAYED_EVENT="${NEXMARK_SQL_PROB_DELAYED_EVENT:-0}"
+DEFAULT_SQL_OCCASIONAL_DELAY_MIN_SEC="${NEXMARK_SQL_OCCASIONAL_DELAY_MIN_SEC:-60}"
+DEFAULT_SQL_OCCASIONAL_DELAY_SEC="${NEXMARK_SQL_OCCASIONAL_DELAY_SEC:-240}"
+DEFAULT_SQL_OUT_OF_ORDER_GROUP_SIZE="${NEXMARK_SQL_OUT_OF_ORDER_GROUP_SIZE:-1}"
 
 # ── Print banner ────────────────────────────────────────────────────────────
 echo "============================================================"
@@ -283,6 +287,10 @@ if $DO_SQL && [[ -f "${SQL_TEMPLATE}" && -d "${NEXMARK_SQL_DIR}" ]]; then
                 -e "s|__TPS__|${DEFAULT_SQL_TPS}|g" \
                 -e "s|__EVENTS__|${DEFAULT_SQL_EVENTS}|g" \
                 -e "s|__MAX_EMIT_SPEED__|${DEFAULT_SQL_MAX_EMIT_SPEED}|g" \
+                -e "s|__PROB_DELAYED_EVENT__|${DEFAULT_SQL_PROB_DELAYED_EVENT}|g" \
+                -e "s|__OCCASIONAL_DELAY_MIN_SEC__|${DEFAULT_SQL_OCCASIONAL_DELAY_MIN_SEC}|g" \
+                -e "s|__OCCASIONAL_DELAY_SEC__|${DEFAULT_SQL_OCCASIONAL_DELAY_SEC}|g" \
+                -e "s|__OUT_OF_ORDER_GROUP_SIZE__|${DEFAULT_SQL_OUT_OF_ORDER_GROUP_SIZE}|g" \
                 -e "s|__PIPELINE_NAME__|${qname}-sql-ds2|g"
             echo -e "  ${GREEN}✓${NC} ${qname}-sql-ds2.yaml"
             ((++generated))
@@ -295,6 +303,10 @@ if $DO_SQL && [[ -f "${SQL_TEMPLATE}" && -d "${NEXMARK_SQL_DIR}" ]]; then
                 -e "s|__TPS__|${DEFAULT_SQL_TPS}|g" \
                 -e "s|__EVENTS__|${DEFAULT_SQL_EVENTS}|g" \
                 -e "s|__MAX_EMIT_SPEED__|${DEFAULT_SQL_MAX_EMIT_SPEED}|g" \
+                -e "s|__PROB_DELAYED_EVENT__|${DEFAULT_SQL_PROB_DELAYED_EVENT}|g" \
+                -e "s|__OCCASIONAL_DELAY_MIN_SEC__|${DEFAULT_SQL_OCCASIONAL_DELAY_MIN_SEC}|g" \
+                -e "s|__OCCASIONAL_DELAY_SEC__|${DEFAULT_SQL_OCCASIONAL_DELAY_SEC}|g" \
+                -e "s|__OUT_OF_ORDER_GROUP_SIZE__|${DEFAULT_SQL_OUT_OF_ORDER_GROUP_SIZE}|g" \
                 -e "s|__PIPELINE_NAME__|${qname}-sql-justin|g"
             echo -e "  ${GREEN}✓${NC} ${qname}-sql-justin.yaml"
             ((++generated))
@@ -320,6 +332,10 @@ if $DO_SQL_SSD && [[ -f "${SQL_TEMPLATE}" && -d "${NEXMARK_SQL_DIR}" ]]; then
                 -e "s|__TPS__|${DEFAULT_SQL_TPS}|g" \
                 -e "s|__EVENTS__|${DEFAULT_SQL_EVENTS}|g" \
                 -e "s|__MAX_EMIT_SPEED__|${DEFAULT_SQL_MAX_EMIT_SPEED}|g" \
+                -e "s|__PROB_DELAYED_EVENT__|${DEFAULT_SQL_PROB_DELAYED_EVENT}|g" \
+                -e "s|__OCCASIONAL_DELAY_MIN_SEC__|${DEFAULT_SQL_OCCASIONAL_DELAY_MIN_SEC}|g" \
+                -e "s|__OCCASIONAL_DELAY_SEC__|${DEFAULT_SQL_OCCASIONAL_DELAY_SEC}|g" \
+                -e "s|__OUT_OF_ORDER_GROUP_SIZE__|${DEFAULT_SQL_OUT_OF_ORDER_GROUP_SIZE}|g" \
                 -e "s|__PIPELINE_NAME__|${qname}-sql-ssd-ds2|g"
             inject_ssd_config "$tmp" "$out" "$SSD_HOST_PATH"
             rm -f "$tmp"
@@ -335,6 +351,10 @@ if $DO_SQL_SSD && [[ -f "${SQL_TEMPLATE}" && -d "${NEXMARK_SQL_DIR}" ]]; then
                 -e "s|__TPS__|${DEFAULT_SQL_TPS}|g" \
                 -e "s|__EVENTS__|${DEFAULT_SQL_EVENTS}|g" \
                 -e "s|__MAX_EMIT_SPEED__|${DEFAULT_SQL_MAX_EMIT_SPEED}|g" \
+                -e "s|__PROB_DELAYED_EVENT__|${DEFAULT_SQL_PROB_DELAYED_EVENT}|g" \
+                -e "s|__OCCASIONAL_DELAY_MIN_SEC__|${DEFAULT_SQL_OCCASIONAL_DELAY_MIN_SEC}|g" \
+                -e "s|__OCCASIONAL_DELAY_SEC__|${DEFAULT_SQL_OCCASIONAL_DELAY_SEC}|g" \
+                -e "s|__OUT_OF_ORDER_GROUP_SIZE__|${DEFAULT_SQL_OUT_OF_ORDER_GROUP_SIZE}|g" \
                 -e "s|__PIPELINE_NAME__|${qname}-sql-ssd-justin|g"
             inject_ssd_config "$tmp" "$out" "$SSD_HOST_PATH"
             rm -f "$tmp"
