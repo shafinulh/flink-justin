@@ -1,6 +1,6 @@
 #!/bin/bash
 ###############################################################################
-# 04-build-images.sh
+# 04-build-base-images.sh
 #
 # Builds the two Docker images needed by Justin:
 #   1. flink-justin:dais         – Custom Flink with Justin memory management

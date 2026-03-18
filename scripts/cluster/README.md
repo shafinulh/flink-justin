@@ -29,7 +29,7 @@ RocksDB SSD experiments use `/data/flink/rocksdb`.
 ./01-reset-cluster.sh          # Full k8s reset (or ./01b-soft-reset.sh for soft)
 ./02-label-nodes.sh            # Label nodes for JM/TM scheduling
 ./03-deploy-monitoring.sh      # Prometheus, Grafana, Loki, cert-manager
-./04-build-images.sh           # Build flink-justin + operator images (~15 min)
+./04-build-base-images.sh      # Build flink-justin + operator images (~15 min)
 ./04b-build-nexmark-sql-image.sh  # Build SQL overlay image (if running SQL queries)
 ./05-deploy-operator.sh        # Deploy Flink K8s Operator via Helm
 ./06-generate-jobs.sh          # Generate job YAMLs from templates
