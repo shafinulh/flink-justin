@@ -10,6 +10,7 @@ spec:
     job.autoscaler.enabled: 'true'
     job.autoscaler.justin.enabled: 'true'
     job.autoscaler.memory.max-level: '4'
+    job.autoscaler.scaling-config.history.max.count: '100'
     job.autoscaler.stabilization.interval: 13m
     job.autoscaler.cache-hit-rate.min.threshold: '0.8'
     job.autoscaler.state-latency.threshold: '1000000.0'

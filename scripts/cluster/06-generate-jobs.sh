@@ -2,9 +2,9 @@
 ###############################################################################
 # 06-generate-jobs.sh
 #
-# Generates Nexmark job YAML files from templates. Jobs are placed in the
-# jobs/ directory (which is git-ignored — each collaborator generates their
-# own to match their environment).
+# Generates Nexmark job YAML files from templates. Generated jobs are placed in
+# the jobs/ directory (which is git-ignored — each collaborator generates their
+# own to match their environment). Hand-maintained specs live in manual-jobs/.
 #
 # Usage:
 #   ./06-generate-jobs.sh [MODE...]
@@ -52,6 +52,10 @@ DS_QUERY_NAMES=(1 2 3 5 8 11)
 SQL_QUERY_NAMES=(
     q20 q20_unique q9 q9_unique q4 q4_unique
     q18 q19 q1 q3 q5 q8 q11
+)
+
+ROCKSDB_OPTIONS_SQL_QUERY_NAMES=(
+    q20 q20_unique q9 q9_unique q4 q4_unique q18 q19
 )
 
 # ── Parse mode arguments ────────────────────────────────────────────────────
@@ -102,6 +106,11 @@ DEFAULT_SQL_OCCASIONAL_DELAY_MIN_SEC="${NEXMARK_SQL_OCCASIONAL_DELAY_MIN_SEC:-60
 DEFAULT_SQL_OCCASIONAL_DELAY_SEC="${NEXMARK_SQL_OCCASIONAL_DELAY_SEC:-240}"
 DEFAULT_SQL_OUT_OF_ORDER_GROUP_SIZE="${NEXMARK_SQL_OUT_OF_ORDER_GROUP_SIZE:-1}"
 
+Q20_UNIQUE_SQL_TPS="${Q20_UNIQUE_SQL_TPS:-100000}"
+Q20_UNIQUE_SQL_EVENTS="${Q20_UNIQUE_SQL_EVENTS:-125000000}"
+Q20_UNIQUE_MEMORY_MAX_LEVEL="${Q20_UNIQUE_MEMORY_MAX_LEVEL:-4}"
+Q20_UNIQUE_SCALING_CONFIG_HISTORY_MAX_COUNT="${Q20_UNIQUE_SCALING_CONFIG_HISTORY_MAX_COUNT:-100}"
+
 # ── Print banner ────────────────────────────────────────────────────────────
 echo "============================================================"
 echo " Preparing Nexmark Benchmark Jobs"
@@ -133,6 +142,40 @@ skip_existing() {
         return 0  # true = skip
     fi
     return 1      # false = generate
+}
+
+sql_tps_for_query() {
+    local qname="$1"
+    case "${qname}" in
+        q20_unique) echo "${Q20_UNIQUE_SQL_TPS}" ;;
+        *)          echo "${DEFAULT_SQL_TPS}" ;;
+    esac
+}
+
+sql_events_for_query() {
+    local qname="$1"
+    case "${qname}" in
+        q20_unique) echo "${Q20_UNIQUE_SQL_EVENTS}" ;;
+        *)          echo "${DEFAULT_SQL_EVENTS}" ;;
+    esac
+}
+
+sql_out_of_order_group_size_for_query() {
+    local qname="$1"
+    case "${qname}" in
+        *) echo "${DEFAULT_SQL_OUT_OF_ORDER_GROUP_SIZE}" ;;
+    esac
+}
+
+is_rocksdb_options_query() {
+    local qname="$1"
+    local candidate
+    for candidate in "${ROCKSDB_OPTIONS_SQL_QUERY_NAMES[@]}"; do
+        if [[ "${candidate}" == "${qname}" ]]; then
+            return 0
+        fi
+    done
+    return 1
 }
 
 # ── Helper: inject SSD config into any YAML (DataStream or SQL) ─────────────
@@ -186,6 +229,45 @@ with open(sys.argv[5], 'w') as f:
 " "$input" "$CHECKPOINT_HOST_PATH" "$CHECKPOINT_MOUNT_PATH" "$ssd_path" "$output"
 }
 
+apply_sql_variant_overrides() {
+    local input="$1" output="$2" qname="$3" rocksdb_options="$4"
+    python3 - "$input" "$output" "$qname" "$rocksdb_options" \
+        "$Q20_UNIQUE_MEMORY_MAX_LEVEL" "$Q20_UNIQUE_SCALING_CONFIG_HISTORY_MAX_COUNT" <<'PY'
+import sys
+import yaml
+
+input_path, output_path, qname, rocksdb_options, memory_max_level, history_max_count = sys.argv[1:7]
+
+with open(input_path) as f:
+    doc = yaml.safe_load(f)
+
+cfg = doc["spec"]["flinkConfiguration"]
+
+if qname == "q20_unique" or rocksdb_options == "true":
+    cfg["job.autoscaler.memory.max-level"] = str(memory_max_level)
+    cfg["job.autoscaler.scaling-config.history.max.count"] = str(history_max_count)
+
+if rocksdb_options == "true":
+    cfg.update(
+        {
+            "state.backend.rocksdb.memory.managed": "false",
+            "state.backend.rocksdb.options-factory": "com.example.CustomRocksDBOptionsFactoryKubernetesJustin",
+            "state.backend.rocksdb.metrics.block-cache-capacity": "true",
+            "state.backend.rocksdb.metrics.block-cache-pinned-usage": "true",
+            "state.backend.rocksdb.metrics.iter-bytes-read": "true",
+            "state.backend.rocksdb.metrics.num-files-at-level0": "true",
+            "state.backend.rocksdb.metrics.num-files-at-level1": "true",
+            "state.backend.rocksdb.metrics.num-files-at-level2": "true",
+            "state.backend.rocksdb.metrics.num-immutable-mem-table": "true",
+            "state.backend.rocksdb.metrics.num-live-versions": "true",
+        }
+    )
+
+with open(output_path, "w") as f:
+    yaml.dump(doc, f, default_flow_style=False, sort_keys=False, width=200)
+PY
+}
+
 # ── Helper: generate a job from a template ───────────────────────────────────
 # Usage: generate_from_template <template> <output> <image> <justin> [extra sed args]
 generate_from_template() {
@@ -202,6 +284,42 @@ generate_from_template() {
     # Append any extra sed expressions (for SQL placeholders)
     sed_args+=("$@")
     sed "${sed_args[@]}" "$template" > "$outfile"
+}
+
+generate_sql_variant() {
+    local outfile="$1" image="$2" justin="$3" qname="$4" pipeline_name="$5" use_ssd="$6" rocksdb_options="$7"
+    local tps events out_of_order tmp
+
+    tps="$(sql_tps_for_query "${qname}")"
+    events="$(sql_events_for_query "${qname}")"
+    out_of_order="$(sql_out_of_order_group_size_for_query "${qname}")"
+
+    tmp="$(mktemp)"
+    generate_from_template "$SQL_TEMPLATE" "$tmp" "$image" "$justin" \
+        -e "s|__QUERY__|${qname}|g" \
+        -e "s|__TPS__|${tps}|g" \
+        -e "s|__EVENTS__|${events}|g" \
+        -e "s|__MAX_EMIT_SPEED__|${DEFAULT_SQL_MAX_EMIT_SPEED}|g" \
+        -e "s|__PROB_DELAYED_EVENT__|${DEFAULT_SQL_PROB_DELAYED_EVENT}|g" \
+        -e "s|__OCCASIONAL_DELAY_MIN_SEC__|${DEFAULT_SQL_OCCASIONAL_DELAY_MIN_SEC}|g" \
+        -e "s|__OCCASIONAL_DELAY_SEC__|${DEFAULT_SQL_OCCASIONAL_DELAY_SEC}|g" \
+        -e "s|__OUT_OF_ORDER_GROUP_SIZE__|${out_of_order}|g" \
+        -e "s|__PIPELINE_NAME__|${pipeline_name}|g"
+
+    if [[ "${qname}" == "q20_unique" || "${rocksdb_options}" == "true" ]]; then
+        local mutated
+        mutated="$(mktemp)"
+        apply_sql_variant_overrides "$tmp" "$mutated" "$qname" "$rocksdb_options"
+        rm -f "$tmp"
+        tmp="$mutated"
+    fi
+
+    if [[ "${use_ssd}" == "true" ]]; then
+        inject_ssd_config "$tmp" "$outfile" "$SSD_HOST_PATH"
+        rm -f "$tmp"
+    else
+        mv "$tmp" "$outfile"
+    fi
 }
 
 ###############################################################################
@@ -282,32 +400,14 @@ if $DO_SQL && [[ -f "${SQL_TEMPLATE}" && -d "${NEXMARK_SQL_DIR}" ]]; then
 
         out="${OUTPUT_DIR}/${qname}-sql-ds2.yaml"
         if ! skip_existing "$out"; then
-            generate_from_template "$SQL_TEMPLATE" "$out" "$FLINK_SQL_IMAGE" "false" \
-                -e "s|__QUERY__|${qname}|g" \
-                -e "s|__TPS__|${DEFAULT_SQL_TPS}|g" \
-                -e "s|__EVENTS__|${DEFAULT_SQL_EVENTS}|g" \
-                -e "s|__MAX_EMIT_SPEED__|${DEFAULT_SQL_MAX_EMIT_SPEED}|g" \
-                -e "s|__PROB_DELAYED_EVENT__|${DEFAULT_SQL_PROB_DELAYED_EVENT}|g" \
-                -e "s|__OCCASIONAL_DELAY_MIN_SEC__|${DEFAULT_SQL_OCCASIONAL_DELAY_MIN_SEC}|g" \
-                -e "s|__OCCASIONAL_DELAY_SEC__|${DEFAULT_SQL_OCCASIONAL_DELAY_SEC}|g" \
-                -e "s|__OUT_OF_ORDER_GROUP_SIZE__|${DEFAULT_SQL_OUT_OF_ORDER_GROUP_SIZE}|g" \
-                -e "s|__PIPELINE_NAME__|${qname}-sql-ds2|g"
+            generate_sql_variant "$out" "$FLINK_SQL_IMAGE" "false" "$qname" "${qname}-sql-ds2" "false" "false"
             echo -e "  ${GREEN}✓${NC} ${qname}-sql-ds2.yaml"
             ((++generated))
         fi
 
         out="${OUTPUT_DIR}/${qname}-sql-justin.yaml"
         if ! skip_existing "$out"; then
-            generate_from_template "$SQL_TEMPLATE" "$out" "$FLINK_SQL_IMAGE" "true" \
-                -e "s|__QUERY__|${qname}|g" \
-                -e "s|__TPS__|${DEFAULT_SQL_TPS}|g" \
-                -e "s|__EVENTS__|${DEFAULT_SQL_EVENTS}|g" \
-                -e "s|__MAX_EMIT_SPEED__|${DEFAULT_SQL_MAX_EMIT_SPEED}|g" \
-                -e "s|__PROB_DELAYED_EVENT__|${DEFAULT_SQL_PROB_DELAYED_EVENT}|g" \
-                -e "s|__OCCASIONAL_DELAY_MIN_SEC__|${DEFAULT_SQL_OCCASIONAL_DELAY_MIN_SEC}|g" \
-                -e "s|__OCCASIONAL_DELAY_SEC__|${DEFAULT_SQL_OCCASIONAL_DELAY_SEC}|g" \
-                -e "s|__OUT_OF_ORDER_GROUP_SIZE__|${DEFAULT_SQL_OUT_OF_ORDER_GROUP_SIZE}|g" \
-                -e "s|__PIPELINE_NAME__|${qname}-sql-justin|g"
+            generate_sql_variant "$out" "$FLINK_SQL_IMAGE" "true" "$qname" "${qname}-sql-justin" "false" "false"
             echo -e "  ${GREEN}✓${NC} ${qname}-sql-justin.yaml"
             ((++generated))
         fi
@@ -326,40 +426,25 @@ if $DO_SQL_SSD && [[ -f "${SQL_TEMPLATE}" && -d "${NEXMARK_SQL_DIR}" ]]; then
 
         out="${OUTPUT_DIR}/${qname}-sql-ssd-ds2.yaml"
         if ! skip_existing "$out"; then
-            tmp=$(mktemp)
-            generate_from_template "$SQL_TEMPLATE" "$tmp" "$FLINK_SQL_IMAGE" "false" \
-                -e "s|__QUERY__|${qname}|g" \
-                -e "s|__TPS__|${DEFAULT_SQL_TPS}|g" \
-                -e "s|__EVENTS__|${DEFAULT_SQL_EVENTS}|g" \
-                -e "s|__MAX_EMIT_SPEED__|${DEFAULT_SQL_MAX_EMIT_SPEED}|g" \
-                -e "s|__PROB_DELAYED_EVENT__|${DEFAULT_SQL_PROB_DELAYED_EVENT}|g" \
-                -e "s|__OCCASIONAL_DELAY_MIN_SEC__|${DEFAULT_SQL_OCCASIONAL_DELAY_MIN_SEC}|g" \
-                -e "s|__OCCASIONAL_DELAY_SEC__|${DEFAULT_SQL_OCCASIONAL_DELAY_SEC}|g" \
-                -e "s|__OUT_OF_ORDER_GROUP_SIZE__|${DEFAULT_SQL_OUT_OF_ORDER_GROUP_SIZE}|g" \
-                -e "s|__PIPELINE_NAME__|${qname}-sql-ssd-ds2|g"
-            inject_ssd_config "$tmp" "$out" "$SSD_HOST_PATH"
-            rm -f "$tmp"
+            generate_sql_variant "$out" "$FLINK_SQL_IMAGE" "false" "$qname" "${qname}-sql-ssd-ds2" "true" "false"
             echo -e "  ${GREEN}✓${NC} ${qname}-sql-ssd-ds2.yaml"
             ((++generated))
         fi
 
         out="${OUTPUT_DIR}/${qname}-sql-ssd-justin.yaml"
         if ! skip_existing "$out"; then
-            tmp=$(mktemp)
-            generate_from_template "$SQL_TEMPLATE" "$tmp" "$FLINK_SQL_IMAGE" "true" \
-                -e "s|__QUERY__|${qname}|g" \
-                -e "s|__TPS__|${DEFAULT_SQL_TPS}|g" \
-                -e "s|__EVENTS__|${DEFAULT_SQL_EVENTS}|g" \
-                -e "s|__MAX_EMIT_SPEED__|${DEFAULT_SQL_MAX_EMIT_SPEED}|g" \
-                -e "s|__PROB_DELAYED_EVENT__|${DEFAULT_SQL_PROB_DELAYED_EVENT}|g" \
-                -e "s|__OCCASIONAL_DELAY_MIN_SEC__|${DEFAULT_SQL_OCCASIONAL_DELAY_MIN_SEC}|g" \
-                -e "s|__OCCASIONAL_DELAY_SEC__|${DEFAULT_SQL_OCCASIONAL_DELAY_SEC}|g" \
-                -e "s|__OUT_OF_ORDER_GROUP_SIZE__|${DEFAULT_SQL_OUT_OF_ORDER_GROUP_SIZE}|g" \
-                -e "s|__PIPELINE_NAME__|${qname}-sql-ssd-justin|g"
-            inject_ssd_config "$tmp" "$out" "$SSD_HOST_PATH"
-            rm -f "$tmp"
+            generate_sql_variant "$out" "$FLINK_SQL_IMAGE" "true" "$qname" "${qname}-sql-ssd-justin" "true" "false"
             echo -e "  ${GREEN}✓${NC} ${qname}-sql-ssd-justin.yaml"
             ((++generated))
+        fi
+
+        if is_rocksdb_options_query "${qname}"; then
+            out="${OUTPUT_DIR}/${qname}-sql-ssd-justin-rocksdb-options.yaml"
+            if ! skip_existing "$out"; then
+                generate_sql_variant "$out" "$FLINK_SQL_IMAGE" "true" "$qname" "${qname}-sql-ssd-justin-rocksdb-options" "true" "true"
+                echo -e "  ${GREEN}✓${NC} ${qname}-sql-ssd-justin-rocksdb-options.yaml"
+                ((++generated))
+            fi
         fi
     done
 fi

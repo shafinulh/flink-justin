@@ -43,7 +43,7 @@ All machine hostnames, image names/tags, paths, and chart versions live in
 ## Generating Jobs
 
 `jobs/` is git-ignored. Run `06-generate-jobs.sh` to generate job YAMLs for
-your environment.
+your environment. Hand-maintained specs live in `manual-jobs/` and are tracked.
 
 ### How it works
 
@@ -70,7 +70,7 @@ and a `volumeMount` to the taskManager podTemplate.
 | `default` | `queryX-ds2.yaml`, `queryX-justin.yaml` |
 | `ssd` | `queryX-ssd-ds2.yaml`, `queryX-ssd-justin.yaml` |
 | `sql` | `qX-sql-ds2.yaml`, `qX-sql-justin.yaml` |
-| `sql-ssd` | `qX-sql-ssd-ds2.yaml`, `qX-sql-ssd-justin.yaml` |
+| `sql-ssd` | `qX-sql-ssd-ds2.yaml`, `qX-sql-ssd-justin.yaml`, plus `q20_unique-sql-ssd-justin-rocksdb-options.yaml` |
 | `all` | All of the above (default) |
 
 Combine modes: `./06-generate-jobs.sh default sql`
@@ -94,6 +94,11 @@ FORCE_REGENERATE=true ./06-generate-jobs.sh sql   # overwrite SQL jobs
 SSD_HOST_PATH=/mnt/nvme ./06-generate-jobs.sh ssd # custom SSD path
 ```
 
+`q20_unique` generated SQL jobs also use a larger default workload profile:
+`--tps 100000`, `--events 125000000`, plus Justin snapshot retention and
+memory max-level settings. The hand-maintained RocksDB options job in
+`manual-jobs/` keeps its separate `--out-of-order-group-size 1000000`.
+
 ## Running Experiments
 
 Submit a job with `run-job.sh`. It applies the YAML, waits for pods, and
@@ -103,6 +108,7 @@ starts a Flink UI port-forward automatically.
 ./run-job.sh jobs/query5-justin.yaml
 ./run-job.sh jobs/query5-ssd-ds2.yaml
 ./run-job.sh jobs/q20_unique-sql-justin.yaml
+./run-job.sh manual-jobs/q20_unique-sql-ssd-justin-rocksdb-options.yaml
 ```
 
 Once the job is up, in a **separate terminal** run `./07-port-forward.sh` to
@@ -119,6 +125,7 @@ To stop a job:
 
 ```bash
 kubectl delete -f jobs/query5-justin.yaml
+kubectl delete -f manual-jobs/q20_unique-sql-ssd-justin-rocksdb-options.yaml
 ```
 
 To stop the current in-cluster Flink deployment and free local port `8081`
