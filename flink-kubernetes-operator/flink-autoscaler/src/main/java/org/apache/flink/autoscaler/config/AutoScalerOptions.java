@@ -313,6 +313,22 @@ public class AutoScalerOptions {
                     .withFallbackKeys(oldOperatorConfigKey("history.max.age"))
                     .withDescription("Maximum age for past scaling decisions to retain.");
 
+    public static final ConfigOption<Integer> RICH_SCALING_CONFIGURATION_HISTORY_COUNT =
+            autoScalerConfig("scaling-config.history.max.count")
+                    .intType()
+                    .defaultValue(100)
+                    .withDescription(
+                            "Maximum number of persisted rich Justin scaling snapshots to retain"
+                                    + " for observation.");
+
+    public static final ConfigOption<Duration> RICH_SCALING_CONFIGURATION_HISTORY_AGE =
+            autoScalerConfig("scaling-config.history.max.age")
+                    .durationType()
+                    .defaultValue(Duration.ofHours(24))
+                    .withDescription(
+                            "Maximum age for persisted rich Justin scaling snapshots retained"
+                                    + " for observation.");
+
     public static final ConfigOption<MetricAggregator> BUSY_TIME_AGGREGATOR =
             autoScalerConfig("metrics.busy-time.aggregator")
                     .enumType(MetricAggregator.class)

@@ -46,11 +46,11 @@ class ScalingSnapshot:
     vertices: list[VertexInfo]
 
 
-HEADER = (
-    f"{'Vertex':>10}  {'P':>3}  {'MemLvl':>6}  {'Throughput':>12}  "
-    f"{'HScale':>6}  {'VScale':>6}  {'CacheHit':>8}  {'StateLat':>8}"
+DISPLAY_HEADER = (
+    f"{'Vertex':>10}  {'CurP':>4}  {'CurMem':>6}  {'Throughput':>12}  {'CacheHit':>8}  "
+    f"{'P':>3}  {'MemLvl':>6}  {'HScale':>6}  {'VScale':>6}  {'StateLat':>8}"
 )
-SEP = "-" * len(HEADER)
+DISPLAY_SEP = "-" * len(DISPLAY_HEADER)
 
 
 def fmt_throughput(value) -> str:
@@ -59,21 +59,46 @@ def fmt_throughput(value) -> str:
     return f"{value:>12.1f}"
 
 
-def print_snapshot(snapshot: ScalingSnapshot) -> None:
+def fmt_level(value: int | None, default: str = "?") -> str:
+    if value is None:
+        return default
+    return str(value)
+
+def find_previous_vertex(
+    snapshots: list[ScalingSnapshot], snapshot_index: int, vertex_id: str
+) -> VertexInfo | None:
+    for index in range(snapshot_index - 1, -1, -1):
+        for vertex in snapshots[index].vertices:
+            if vertex.vertex_id == vertex_id:
+                return vertex
+    return None
+
+
+def print_snapshot(
+    snapshots: list[ScalingSnapshot],
+    snapshot_index: int,
+) -> None:
+    snapshot = snapshots[snapshot_index]
     print(f"\n  ┌─ {snapshot.timestamp}  period={snapshot.period}")
-    print(f"  │ {HEADER}")
-    print(f"  │ {SEP}")
+    print(f"  │ {DISPLAY_HEADER}")
+    print(f"  │ {DISPLAY_SEP}")
     for vertex in sorted(snapshot.vertices, key=lambda item: item.vertex_id):
+        previous = find_previous_vertex(snapshots, snapshot_index, vertex.vertex_id)
+        current_parallelism = 1 if previous is None else previous.parallelism
+        current_memory_level = 0 if previous is None else previous.memory_level
         horizontal = "yes" if vertex.horizontal_scaling else "no"
         vertical = "yes" if vertex.vertical_scaling else "no"
         cache_hit = f"{vertex.avg_cache_hit_rate:.3f}" if vertex.avg_cache_hit_rate > 0 else "-"
         state_latency = f"{vertex.avg_state_latency:.1f}" if vertex.avg_state_latency > 0 else "-"
         print(
-            f"  │ {vertex.vertex_id[:10]:>10}  {vertex.parallelism:>3}  "
-            f"{vertex.memory_level:>6}  {fmt_throughput(vertex.avg_throughput)}  "
-            f"{horizontal:>6}  {vertical:>6}  {cache_hit:>8}  {state_latency:>8}"
+            f"  │ {vertex.vertex_id[:10]:>10}  "
+            f"{fmt_level(current_parallelism):>4}  {fmt_level(current_memory_level):>6}  "
+            f"{fmt_throughput(vertex.avg_throughput)}  "
+            f"{cache_hit:>8}  "
+            f"{vertex.parallelism:>3}  {vertex.memory_level:>6}  "
+            f"{horizontal:>6}  {vertical:>6}  {state_latency:>8}"
         )
-    print(f"  └{'─' * (len(HEADER) + 1)}")
+    print(f"  └{'─' * (len(DISPLAY_HEADER) + 1)}")
 
 
 def snapshot_to_dict(snapshot: ScalingSnapshot) -> dict:
@@ -368,7 +393,13 @@ def main() -> int:
                 printed_header = True
 
             for snapshot in new_snapshots:
-                print_snapshot(snapshot)
+                snapshot_index = next(
+                    index
+                    for index, candidate in enumerate(snapshots)
+                    if candidate.timestamp == snapshot.timestamp
+                    and candidate.period == snapshot.period
+                )
+                print_snapshot(snapshots, snapshot_index)
 
             if not new_snapshots and not args.follow:
                 print("No rich scaling snapshots found in autoscaler ConfigMap.")

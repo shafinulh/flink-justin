@@ -205,9 +205,9 @@ public class ScalingExecutor<KEY, Context extends JobAutoScalerContext<KEY>> {
             Context context, Instant now, Configuration conf) throws Exception {
         SortedMap<Instant, ScalingConfigurationSnapshot> history =
                 new java.util.TreeMap<>(autoScalerStateStore.getScalingConfigurationHistory(context));
-        Instant expectedStartTime = now.minus(conf.get(VERTEX_SCALING_HISTORY_AGE));
+        Instant expectedStartTime = now.minus(conf.get(RICH_SCALING_CONFIGURATION_HISTORY_AGE));
         history = new java.util.TreeMap<>(history.tailMap(expectedStartTime));
-        while (history.size() > conf.get(VERTEX_SCALING_HISTORY_COUNT)) {
+        while (history.size() > conf.get(RICH_SCALING_CONFIGURATION_HISTORY_COUNT)) {
             history.remove(history.firstKey());
         }
         return history;
