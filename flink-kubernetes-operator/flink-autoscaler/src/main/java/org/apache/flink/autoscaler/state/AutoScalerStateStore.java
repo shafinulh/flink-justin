@@ -20,6 +20,7 @@ package org.apache.flink.autoscaler.state;
 import org.apache.flink.annotation.Experimental;
 import org.apache.flink.autoscaler.DelayedScaleDown;
 import org.apache.flink.autoscaler.JobAutoScalerContext;
+import org.apache.flink.autoscaler.ScalingConfigurationSnapshot;
 import org.apache.flink.autoscaler.ScalingSummary;
 import org.apache.flink.autoscaler.ScalingTracking;
 import org.apache.flink.autoscaler.metrics.CollectedMetrics;
@@ -31,6 +32,7 @@ import javax.annotation.Nonnull;
 import java.time.Instant;
 import java.util.Map;
 import java.util.SortedMap;
+import java.util.TreeMap;
 
 /**
  * The state store is responsible for storing all state during scaling.
@@ -48,6 +50,19 @@ public interface AutoScalerStateStore<KEY, Context extends JobAutoScalerContext<
     @Nonnull
     Map<JobVertexID, SortedMap<Instant, ScalingSummary>> getScalingHistory(Context jobContext)
             throws Exception;
+
+    default void storeScalingConfigurationHistory(
+            Context jobContext,
+            SortedMap<Instant, ScalingConfigurationSnapshot> scalingConfigurationHistory)
+            throws Exception {}
+
+    @Nonnull
+    default SortedMap<Instant, ScalingConfigurationSnapshot> getScalingConfigurationHistory(
+            Context jobContext) throws Exception {
+        return new TreeMap<>();
+    }
+
+    default void removeScalingConfigurationHistory(Context jobContext) throws Exception {}
 
     void storeScalingTracking(Context jobContext, ScalingTracking scalingTrack) throws Exception;
 

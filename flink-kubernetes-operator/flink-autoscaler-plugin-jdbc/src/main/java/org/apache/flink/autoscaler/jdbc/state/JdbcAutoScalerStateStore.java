@@ -21,6 +21,7 @@ import org.apache.flink.annotation.Experimental;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.autoscaler.DelayedScaleDown;
 import org.apache.flink.autoscaler.JobAutoScalerContext;
+import org.apache.flink.autoscaler.ScalingConfigurationSnapshot;
 import org.apache.flink.autoscaler.ScalingSummary;
 import org.apache.flink.autoscaler.ScalingTracking;
 import org.apache.flink.autoscaler.metrics.CollectedMetrics;
@@ -52,6 +53,8 @@ import static org.apache.flink.autoscaler.jdbc.state.StateType.COLLECTED_METRICS
 import static org.apache.flink.autoscaler.jdbc.state.StateType.CONFIG_OVERRIDES;
 import static org.apache.flink.autoscaler.jdbc.state.StateType.DELAYED_SCALE_DOWN;
 import static org.apache.flink.autoscaler.jdbc.state.StateType.PARALLELISM_OVERRIDES;
+import static org.apache.flink.autoscaler.jdbc.state.StateType.RESOURCE_PROFILE_OVERRIDES;
+import static org.apache.flink.autoscaler.jdbc.state.StateType.SCALING_CONFIGURATION_HISTORY;
 import static org.apache.flink.autoscaler.jdbc.state.StateType.SCALING_HISTORY;
 import static org.apache.flink.autoscaler.jdbc.state.StateType.SCALING_TRACKING;
 
@@ -106,6 +109,46 @@ public class JdbcAutoScalerStateStore<KEY, Context extends JobAutoScalerContext<
             jdbcStateStore.removeSerializedState(getSerializeKey(jobContext), SCALING_HISTORY);
             return new HashMap<>();
         }
+    }
+
+    @Override
+    public void storeScalingConfigurationHistory(
+            Context jobContext,
+            SortedMap<Instant, ScalingConfigurationSnapshot> scalingConfigurationHistory)
+            throws Exception {
+        jdbcStateStore.putSerializedState(
+                getSerializeKey(jobContext),
+                SCALING_CONFIGURATION_HISTORY,
+                serializeScalingConfigurationHistory(scalingConfigurationHistory));
+    }
+
+    @Nonnull
+    @Override
+    public SortedMap<Instant, ScalingConfigurationSnapshot> getScalingConfigurationHistory(
+            Context jobContext) {
+        Optional<String> serializedScalingConfigurationHistory =
+                jdbcStateStore.getSerializedState(
+                        getSerializeKey(jobContext), SCALING_CONFIGURATION_HISTORY);
+        if (serializedScalingConfigurationHistory.isEmpty()) {
+            return new TreeMap<>();
+        }
+        try {
+            return deserializeScalingConfigurationHistory(
+                    serializedScalingConfigurationHistory.get());
+        } catch (JacksonException e) {
+            LOG.error(
+                    "Could not deserialize scaling configuration history, possibly the format changed. Discarding...",
+                    e);
+            jdbcStateStore.removeSerializedState(
+                    getSerializeKey(jobContext), SCALING_CONFIGURATION_HISTORY);
+            return new TreeMap<>();
+        }
+    }
+
+    @Override
+    public void removeScalingConfigurationHistory(Context jobContext) {
+        jdbcStateStore.removeSerializedState(
+                getSerializeKey(jobContext), SCALING_CONFIGURATION_HISTORY);
     }
 
     @Override
@@ -195,6 +238,30 @@ public class JdbcAutoScalerStateStore<KEY, Context extends JobAutoScalerContext<
     }
 
     @Override
+    public void storeResourceProfileOverrides(
+            Context jobContext, Map<String, String> resourceProfileOverrides) {
+        jdbcStateStore.putSerializedState(
+                getSerializeKey(jobContext),
+                RESOURCE_PROFILE_OVERRIDES,
+                serializeParallelismOverrides(resourceProfileOverrides));
+    }
+
+    @Nonnull
+    @Override
+    public Map<String, String> getResourceProfileOverrides(Context jobContext) {
+        return jdbcStateStore
+                .getSerializedState(getSerializeKey(jobContext), RESOURCE_PROFILE_OVERRIDES)
+                .map(JdbcAutoScalerStateStore::deserializeParallelismOverrides)
+                .orElse(new HashMap<>());
+    }
+
+    @Override
+    public void removeResourceProfileOverrides(Context jobContext) {
+        jdbcStateStore.removeSerializedState(
+                getSerializeKey(jobContext), RESOURCE_PROFILE_OVERRIDES);
+    }
+
+    @Override
     public void storeConfigChanges(Context jobContext, ConfigChanges configChanges) {
         jdbcStateStore.putSerializedState(
                 getSerializeKey(jobContext),
@@ -274,9 +341,21 @@ public class JdbcAutoScalerStateStore<KEY, Context extends JobAutoScalerContext<
         return YAML_MAPPER.writeValueAsString(scalingHistory);
     }
 
+    protected static String serializeScalingConfigurationHistory(
+            SortedMap<Instant, ScalingConfigurationSnapshot> scalingConfigurationHistory)
+            throws Exception {
+        return YAML_MAPPER.writeValueAsString(scalingConfigurationHistory);
+    }
+
     private static Map<JobVertexID, SortedMap<Instant, ScalingSummary>> deserializeScalingHistory(
             String scalingHistory) throws JacksonException {
         return YAML_MAPPER.readValue(scalingHistory, new TypeReference<>() {});
+    }
+
+    private static SortedMap<Instant, ScalingConfigurationSnapshot>
+            deserializeScalingConfigurationHistory(String scalingConfigurationHistory)
+                    throws JacksonException {
+        return YAML_MAPPER.readValue(scalingConfigurationHistory, new TypeReference<>() {});
     }
 
     protected static String serializeScalingTracking(ScalingTracking scalingTracking)

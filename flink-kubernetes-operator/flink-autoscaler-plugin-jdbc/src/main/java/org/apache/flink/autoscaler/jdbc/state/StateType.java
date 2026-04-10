@@ -24,9 +24,11 @@ import static org.apache.flink.util.Preconditions.checkArgument;
 /** The state type. */
 public enum StateType {
     SCALING_HISTORY("scalingHistory"),
+    SCALING_CONFIGURATION_HISTORY("scalingConfigHistory"),
     SCALING_TRACKING("scalingTracking"),
     COLLECTED_METRICS("collectedMetrics"),
     PARALLELISM_OVERRIDES("parallelismOverrides"),
+    RESOURCE_PROFILE_OVERRIDES("resourceProfileOverrides"),
     CONFIG_OVERRIDES("configOverrides"),
     DELAYED_SCALE_DOWN("delayedScaleDown");
 

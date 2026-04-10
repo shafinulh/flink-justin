@@ -396,4 +396,13 @@ public class AutoScalerOptions {
             autoScalerConfig("state-latency.threshold")
                     .doubleType()
                     .defaultValue(100000.0);
+
+    public static final ConfigOption<Integer> MAX_MEMORY_LEVEL =
+            autoScalerConfig("memory.max-level")
+                    .intType()
+                    .defaultValue(2)
+                    .withDescription(
+                            "Maximum memory level for Justin vertical scaling. "
+                                    + "Valid levels are 0..(max-level - 1). "
+                                    + "Increase this to allow more aggressive vertical scaling steps.");
 }

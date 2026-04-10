@@ -19,6 +19,7 @@ package org.apache.flink.kubernetes.operator.autoscaler.state;
 
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.autoscaler.DelayedScaleDown;
+import org.apache.flink.autoscaler.ScalingConfigurationSnapshot;
 import org.apache.flink.autoscaler.ScalingSummary;
 import org.apache.flink.autoscaler.ScalingTracking;
 import org.apache.flink.autoscaler.metrics.CollectedMetrics;
@@ -69,6 +70,8 @@ public class KubernetesAutoScalerStateStore
     private static final Logger LOG = LoggerFactory.getLogger(KubernetesAutoScalerStateStore.class);
 
     @VisibleForTesting protected static final String SCALING_HISTORY_KEY = "scalingHistory";
+    @VisibleForTesting
+    protected static final String SCALING_CONFIGURATION_HISTORY_KEY = "scalingConfigHistory";
     @VisibleForTesting protected static final String SCALING_TRACKING_KEY = "scalingTracking";
     @VisibleForTesting protected static final String COLLECTED_METRICS_KEY = "collectedMetrics";
 
@@ -105,6 +108,16 @@ public class KubernetesAutoScalerStateStore
     }
 
     @Override
+    public void storeScalingConfigurationHistory(
+            KubernetesJobAutoScalerContext jobContext,
+            SortedMap<Instant, ScalingConfigurationSnapshot> scalingConfigurationHistory) {
+        configMapStore.putSerializedState(
+                jobContext,
+                SCALING_CONFIGURATION_HISTORY_KEY,
+                serializeScalingConfigurationHistory(scalingConfigurationHistory));
+    }
+
+    @Override
     public void storeScalingTracking(
             KubernetesJobAutoScalerContext jobContext, ScalingTracking scalingTrack) {
         configMapStore.putSerializedState(
@@ -131,6 +144,27 @@ public class KubernetesAutoScalerStateStore
         }
     }
 
+    @Nonnull
+    @Override
+    public SortedMap<Instant, ScalingConfigurationSnapshot> getScalingConfigurationHistory(
+            KubernetesJobAutoScalerContext jobContext) {
+        Optional<String> serializedScalingConfigurationHistory =
+                configMapStore.getSerializedState(jobContext, SCALING_CONFIGURATION_HISTORY_KEY);
+        if (serializedScalingConfigurationHistory.isEmpty()) {
+            return new TreeMap<>();
+        }
+        try {
+            return deserializeScalingConfigurationHistory(
+                    serializedScalingConfigurationHistory.get());
+        } catch (JacksonException e) {
+            LOG.error(
+                    "Could not deserialize scaling configuration history, possibly the format changed. Discarding...",
+                    e);
+            configMapStore.removeSerializedState(jobContext, SCALING_CONFIGURATION_HISTORY_KEY);
+            return new TreeMap<>();
+        }
+    }
+
     @Override
     public ScalingTracking getScalingTracking(KubernetesJobAutoScalerContext jobContext) {
         Optional<String> serializedRescalingHistory =
@@ -152,6 +186,11 @@ public class KubernetesAutoScalerStateStore
     @Override
     public void removeScalingHistory(KubernetesJobAutoScalerContext jobContext) {
         configMapStore.removeSerializedState(jobContext, SCALING_HISTORY_KEY);
+    }
+
+    @Override
+    public void removeScalingConfigurationHistory(KubernetesJobAutoScalerContext jobContext) {
+        configMapStore.removeSerializedState(jobContext, SCALING_CONFIGURATION_HISTORY_KEY);
     }
 
     @Override
@@ -303,9 +342,22 @@ public class KubernetesAutoScalerStateStore
         return compress(YAML_MAPPER.writeValueAsString(scalingHistory));
     }
 
+    @SneakyThrows
+    protected static String serializeScalingConfigurationHistory(
+            SortedMap<Instant, ScalingConfigurationSnapshot> scalingConfigurationHistory) {
+        return compress(YAML_MAPPER.writeValueAsString(scalingConfigurationHistory));
+    }
+
     private static Map<JobVertexID, SortedMap<Instant, ScalingSummary>> deserializeScalingHistory(
             String scalingHistory) throws JacksonException {
         return YAML_MAPPER.readValue(decompress(scalingHistory), new TypeReference<>() {});
+    }
+
+    private static SortedMap<Instant, ScalingConfigurationSnapshot>
+            deserializeScalingConfigurationHistory(String scalingConfigurationHistory)
+                    throws JacksonException {
+        return YAML_MAPPER.readValue(
+                decompress(scalingConfigurationHistory), new TypeReference<>() {});
     }
 
     @SneakyThrows
@@ -382,14 +434,37 @@ public class KubernetesAutoScalerStateStore
                         .map(String::length)
                         .orElse(0);
 
+        int scalingConfigurationHistorySize =
+                configMapStore
+                        .getSerializedState(context, SCALING_CONFIGURATION_HISTORY_KEY)
+                        .map(String::length)
+                        .orElse(0);
+
         int metricHistorySize =
                 configMapStore
                         .getSerializedState(context, COLLECTED_METRICS_KEY)
                         .map(String::length)
                         .orElse(0);
 
+        SortedMap<Instant, ScalingConfigurationSnapshot> scalingConfigurationHistory =
+                getScalingConfigurationHistory(context);
         SortedMap<Instant, CollectedMetrics> metricHistory = getCollectedMetrics(context);
-        while (scalingHistorySize + metricHistorySize + scalingTrackingSize > MAX_CM_BYTES) {
+        while (scalingHistorySize
+                        + scalingConfigurationHistorySize
+                        + metricHistorySize
+                        + scalingTrackingSize
+                > MAX_CM_BYTES) {
+            if (!scalingConfigurationHistory.isEmpty()) {
+                var firstKey = scalingConfigurationHistory.firstKey();
+                LOG.info("Trimming scaling configuration history by removing {}", firstKey);
+                scalingConfigurationHistory.remove(firstKey);
+                String compressed =
+                        serializeScalingConfigurationHistory(scalingConfigurationHistory);
+                configMapStore.putSerializedState(
+                        context, SCALING_CONFIGURATION_HISTORY_KEY, compressed);
+                scalingConfigurationHistorySize = compressed.length();
+                continue;
+            }
             if (metricHistory.isEmpty()) {
                 return;
             }

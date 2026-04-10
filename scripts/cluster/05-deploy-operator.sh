@@ -46,6 +46,7 @@ helm install flink-kubernetes-operator \
     "${HELM_CHART}" \
     --set "image.repository=${REGISTRY}/${OPERATOR_IMAGE_NAME}" \
     --set "image.tag=${OPERATOR_IMAGE_TAG}" \
+    --set "image.pullPolicy=Always" \
     -f "${AUTOSCALER_VALUES}"
 echo -e "${GREEN}✓${NC} Helm install complete"
 

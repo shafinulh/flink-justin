@@ -9,6 +9,7 @@ spec:
   flinkConfiguration:
     job.autoscaler.enabled: 'true'
     job.autoscaler.justin.enabled: 'true'
+    job.autoscaler.memory.max-level: '4'
     job.autoscaler.stabilization.interval: 13m
     job.autoscaler.cache-hit-rate.min.threshold: '0.8'
     job.autoscaler.state-latency.threshold: '1000000.0'
@@ -133,7 +134,7 @@ spec:
     - --query
     - q20_unique
     - --tps
-    - '50000'
+    - '100000'
     - --events
     - '125000000'
     - --max-emit-speed
@@ -145,6 +146,6 @@ spec:
     - --occasional-delay-sec
     - '240'
     - --out-of-order-group-size
-    - '1'
+    - '1000000'
     - --job-name
     - q20_unique-sql-ssd-justin-rocksdb-options

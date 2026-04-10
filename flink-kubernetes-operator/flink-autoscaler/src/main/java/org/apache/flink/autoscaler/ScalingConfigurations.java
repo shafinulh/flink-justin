@@ -16,8 +16,6 @@ import static org.apache.flink.autoscaler.metrics.ScalingMetric.*;
 
 public class ScalingConfigurations {
 
-    public static final int MAX_MEMORY_LEVEL = 2;
-
     private final HashMap<JobID, HashMap<Integer, ScalingConfiguration>> scalingConfiguration;
 
     private final HashMap <JobID, Integer> currentPeriod;

@@ -160,13 +160,15 @@ public class ScalingExecutor<KEY, Context extends JobAutoScalerContext<KEY>> {
                         evaluatedMetrics.getVertexMetrics(), scalingSummaries));
 
         if (conf.get(JUSTIN_ENABLED)) {
+            var currentPeriod = periods.getOrDefault(context.getJobID(), 0);
             var currentScalingConf =
                     scalingConfigurations.setCurrentConfiguration(
                             context.getJobID(),
                             evaluatedMetrics.getVertexMetrics(),
                             scalingSummaries,
-                            periods.getOrDefault(context.getJobID(), 0));
+                            currentPeriod);
             policy(context, currentScalingConf, conf);
+            storeScalingConfigurationHistory(context, now, currentPeriod, currentScalingConf, conf);
             LOG.info(scalingConfigurations.toString());
 
             autoScalerStateStore.storeParallelismOverrides(
@@ -184,6 +186,31 @@ public class ScalingExecutor<KEY, Context extends JobAutoScalerContext<KEY>> {
         delayedScaleDown.clearAll();
 
         return true;
+    }
+
+    private void storeScalingConfigurationHistory(
+            Context context,
+            Instant now,
+            int period,
+            ScalingConfigurations.ScalingConfiguration scalingConfiguration,
+            Configuration conf)
+            throws Exception {
+        SortedMap<Instant, ScalingConfigurationSnapshot> history =
+                getTrimmedScalingConfigurationHistory(context, now, conf);
+        history.put(now, ScalingConfigurationSnapshot.from(period, scalingConfiguration));
+        autoScalerStateStore.storeScalingConfigurationHistory(context, history);
+    }
+
+    private SortedMap<Instant, ScalingConfigurationSnapshot> getTrimmedScalingConfigurationHistory(
+            Context context, Instant now, Configuration conf) throws Exception {
+        SortedMap<Instant, ScalingConfigurationSnapshot> history =
+                new java.util.TreeMap<>(autoScalerStateStore.getScalingConfigurationHistory(context));
+        Instant expectedStartTime = now.minus(conf.get(VERTEX_SCALING_HISTORY_AGE));
+        history = new java.util.TreeMap<>(history.tailMap(expectedStartTime));
+        while (history.size() > conf.get(VERTEX_SCALING_HISTORY_COUNT)) {
+            history.remove(history.firstKey());
+        }
+        return history;
     }
 
     private void updateRecommendedParallelism(
@@ -565,6 +592,8 @@ public class ScalingExecutor<KEY, Context extends JobAutoScalerContext<KEY>> {
     }
 
     private void policy(Context context, ScalingConfigurations.ScalingConfiguration scaling, Configuration conf) {
+        LOG.info("Justin: policy() invoked. MAX_MEMORY_LEVEL={}, MIN_CACHE_HIT_RATE_THRESHOLD={}, STATE_ACCESS_LATENCY_THRESHOLD={}",
+                conf.get(MAX_MEMORY_LEVEL), conf.get(MIN_CACHE_HIT_RATE_THRESHOLD), conf.get(STATE_ACCESS_LATENCY_THRESHOLD));
         scaling.getScaling().forEach((id, information) -> {
             var previousInformation =
                     scalingConfigurations.getPreviousScalingInformation(
@@ -591,8 +620,8 @@ public class ScalingExecutor<KEY, Context extends JobAutoScalerContext<KEY>> {
                                     LOG.info("Justin: Improved Tput and cache hit ratio below max thold -> {} > {} "
                                             , information.getAvgThroughput()
                                             , previousInformation.getAvgThroughput() * (1.0 + conf.get(MIN_IMPROVED_THROUGHPUT)));
-                                    if (previousInformation.getMemoryLevel()+1 < ScalingConfigurations.MAX_MEMORY_LEVEL) { // Can scale up
-                                        LOG.info("Justin: Cant scale up");
+                                    if (previousInformation.getMemoryLevel()+1 < conf.get(MAX_MEMORY_LEVEL)) { // Can scale up
+                                        LOG.info("Justin: Can scale up vertically, memLevel {} -> {}", previousInformation.getMemoryLevel(), previousInformation.getMemoryLevel()+1);
                                         information.setParallelism(previousInformation.getParallelism());
                                         information.setMemoryLevel(previousInformation.getMemoryLevel()+1);
                                         information.setVerticalScaling(true);
@@ -616,7 +645,7 @@ public class ScalingExecutor<KEY, Context extends JobAutoScalerContext<KEY>> {
                             LOG.info("Justin: No previous vertical decision");
                             if (((information.getAvgCacheHitRate() < conf.get(MIN_CACHE_HIT_RATE_THRESHOLD))
                                     || information.getAvgStateLatency() > conf.get(STATE_ACCESS_LATENCY_THRESHOLD))
-                              && previousInformation.getMemoryLevel()+1 < ScalingConfigurations.MAX_MEMORY_LEVEL) {
+                              && previousInformation.getMemoryLevel()+1 < conf.get(MAX_MEMORY_LEVEL)) {
                                 LOG.info("Justin: indicators show that we should scale up");
                                 information.setParallelism(previousInformation.getParallelism());
                                 information.setMemoryLevel(previousInformation.getMemoryLevel()+1);
