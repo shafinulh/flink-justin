@@ -37,7 +37,7 @@ GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
 
 TEMPLATE_DIR="${SCRIPT_DIR}/templates"
 OUTPUT_DIR="${SCRIPT_DIR}/jobs"
-NEXMARK_ROOT="${NEXMARK_ROOT:-/opt/nexmark-v2}"
+NEXMARK_ROOT="${NEXMARK_ROOT:-$(cd "${SCRIPT_DIR}/../../.." && pwd)/nexmark-v2}"
 NEXMARK_SQL_DIR="${NEXMARK_ROOT}/nexmark-flink/src/main/resources/queries"
 NEXMARK_CONF="${NEXMARK_ROOT}/nexmark-flink/src/main/resources/conf/nexmark.yaml"
 DEFAULT_SQL_WORKLOAD_SUITE="${NEXMARK_SQL_WORKLOAD_SUITE:-sp1m}"

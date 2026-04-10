@@ -14,7 +14,7 @@ source "${SCRIPT_DIR}/env.sh"
 
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
 
-NEXMARK_ROOT="${NEXMARK_ROOT:-/opt/nexmark-v2}"
+NEXMARK_ROOT="${NEXMARK_ROOT:-$(cd "${SCRIPT_DIR}/../../.." && pwd)/nexmark-v2}"
 NEXMARK_JAR="${NEXMARK_ROOT}/nexmark-flink/target/nexmark-flink-0.3-SNAPSHOT.jar"
 DOCKERFILE_PATH="${SCRIPT_DIR}/nexmark-sql-image/Dockerfile"
 PREPULL_SQL_IMAGE="${PREPULL_SQL_IMAGE:-true}"
@@ -66,7 +66,7 @@ echo "── Building nexmark-flink jar ─────────────�
 echo -e "${YELLOW}  Packaging nexmark-v2 against Flink ${NEXMARK_FLINK_VERSION}...${NC}"
 mvn -f "${NEXMARK_ROOT}/pom.xml" \
     -pl nexmark-flink -am package \
-    -DskipTests \
+    -Dmaven.test.skip=true \
     -Dflink.version="${NEXMARK_FLINK_VERSION}"
 
 if [[ ! -f "${NEXMARK_JAR}" ]]; then
@@ -74,7 +74,21 @@ if [[ ! -f "${NEXMARK_JAR}" ]]; then
     exit 1
 fi
 
+echo ""
+echo "── Building rocksdb-options jar ─────────────────────────────"
+echo -e "${YELLOW}  Packaging rocksdb-options against Flink ${NEXMARK_FLINK_VERSION}...${NC}"
+mvn -f "${ROCKSDB_OPTIONS_HOME}/pom.xml" \
+    package \
+    -Dmaven.test.skip=true \
+    -Dflink.version="${NEXMARK_FLINK_VERSION}"
+
+if [[ ! -f "${ROCKSDB_OPTIONS_JAR}" ]]; then
+    echo -e "${RED}✗ RocksDB options jar not found: ${ROCKSDB_OPTIONS_JAR}${NC}"
+    exit 1
+fi
+
 cp "${NEXMARK_JAR}" "${BUILD_CONTEXT}/nexmark-flink-0.3-SNAPSHOT.jar"
+cp "${ROCKSDB_OPTIONS_JAR}" "${BUILD_CONTEXT}/${ROCKSDB_OPTIONS_JAR_NAME}"
 
 echo ""
 echo "── Building flink-justin SQL overlay ────────────────────────"
@@ -88,8 +102,8 @@ echo -e "${GREEN}✓${NC} SQL overlay image built"
 echo ""
 echo "── Verifying overlay image contents ─────────────────────────"
 docker run --rm --entrypoint sh "${FLINK_SQL_IMAGE_NAME}:${FLINK_SQL_IMAGE_TAG}" \
-    -lc 'test -f /opt/flink/lib/nexmark-flink-0.3-SNAPSHOT.jar'
-echo -e "${GREEN}✓${NC} Nexmark jar is present in /opt/flink/lib"
+    -lc "test -f /opt/flink/lib/nexmark-flink-0.3-SNAPSHOT.jar && test -f /opt/flink/lib/${ROCKSDB_OPTIONS_JAR_NAME}"
+echo -e "${GREEN}✓${NC} Nexmark jar and RocksDB options jar are present in /opt/flink/lib"
 
 echo ""
 echo "── Pushing SQL overlay image ────────────────────────────────"
